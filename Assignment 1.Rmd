@@ -1,0 +1,715 @@
+---
+title: "Assignment 1"
+author: "Group 1"
+date: "29/08/2021"
+output:
+  html_document:
+    toc: yes
+    toc_depth: '2'
+    df_print: paged
+---
+## Loading vaccinations data from STATS NZ using API
+To load the data we have used API published by Stats NZ
+```{r setup}
+source("get-opendata-catalogue-fun.R")
+
+Catalogue <- get_odata_catalogue(
+  service="https://api.stats.govt.nz/opendata/v1",
+  endpoint="data.json",
+  service_api_key = "3727dfa9d9f44874a510f426cd115b1c"
+)
+
+
+source("get-odata-fun.R")
+Observations_CPCOV10<-  Filter(function(x)!all(is.na(x)),
+                               get_odata(
+                                 service = "https://api.stats.govt.nz/opendata/v1",
+                                 endpoint = "Covid-19Indicators",
+                                 entity = "Observations",
+                                 query_option = "$filter=(
+                                                    ResourceID eq 'CPCOV10' 
+                                                  )   
+
+                                          ",
+                                 service_api_key = "3727dfa9d9f44874a510f426cd115b1c"))
+Observations_CPCOV11<-  Filter(function(x)!all(is.na(x)),
+                               get_odata(
+                                 service = "https://api.stats.govt.nz/opendata/v1",
+                                 endpoint = "Covid-19Indicators",
+                                 entity = "Observations",
+                                 query_option = "$filter=(
+                                                    ResourceID eq 'CPCOV11' 
+                                                  )   
+
+                                          ",
+                                 service_api_key = "3727dfa9d9f44874a510f426cd115b1c"))
+
+#Change Period to Date variable
+library(lubridate)
+library(DT)
+library(tidyverse)
+Observations_CPCOV10$Period<-as.Date(Observations_CPCOV10$Period, format="%Y-%m-%d")
+Observations_CPCOV11$Period<-as.Date(Observations_CPCOV11$Period, format="%Y-%m-%d")
+Observations_CPCOV10$Period_Num<-as.numeric(Observations_CPCOV10$Period)
+Observations_CPCOV11$Period_Num<-as.numeric(Observations_CPCOV11$Period)
+```
+
+
+
+## Cumulative vaccination dataset analisys
+
+### Cumulative vaccination: Data overview
+
+Plot the dataset using *ggplot* func
+
+```{r plot}
+library(ggplot2)
+ggplot(Observations_CPCOV10, aes(x=Period, y = Value, group=Label1, colour=Label1)) + 
+  geom_line() + 
+  geom_point(size = 1)+
+  ggtitle("Cumulative vaccinations")+
+  xlab("Week ending") +
+  ylab("Number of vaccinations administered")+
+  labs(fill = "1")+
+  theme(legend.position="top")
+
+```
+
+Data table
+
+```{r cumulative_data_table}
+Observations_CPCOV10
+```
+Summary table
+
+```{r summary}
+summary(Observations_CPCOV10)
+```
+### Cumulative vaccination: Explore dataset for a missing data
+
+For a dataset, it is important to be able to answer these questions about missing values.
+
+```{r missing_cumulative}
+library(visdat)
+library(ggplot2)
+vis_dat(Observations_CPCOV10) + ggtitle("Missing Value Distribution")
+```
+
+As per above there is no missing data in the dataset.
+
+### Cumulative vaccination: Explore dataset for outliers
+```{r outliers1}
+
+ggplot(data = Observations_CPCOV11, aes(x=Period, y=Value)) + geom_boxplot(aes(fill=Label1), outlier.colour = "red")+ 
+labs(title = paste("Uni-variable boxplots"))+
+  theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+```
+
+There are no outliers detected
+
+### Cumulative vaccination: Split data by testing and trainign dataset
+
+The first 80% of data is assigned to training dataset and the last 20% is assigned to testing dataset.
+```{r sampling}
+vaccin_adm<-Observations_CPCOV10[which(Observations_CPCOV10$Label1=="Cumulative vaccinations administered"),] #separate Cumulative vaccinations administered
+d<-1:(nrow(vaccin_adm)*0.8)
+train<-vaccin_adm[d,]
+test<-vaccin_adm[-d,]
+
+#order by date
+train<-train[order(train$Period),]
+test<-test[order(test$Period),]
+```
+
+### Cumulative vaccination: Vaccination forecast using SVM method 
+
+```{r svm}
+library(e1071)
+library(Metrics)
+
+#train with hyperparameter tuning
+tuneResultsvm <- tune(svm, Value ~ Period,  data = train, kernel = "polynomial",
+              ranges = list(gamma=2^(-1:1), epsilon = seq(0,1,0.1), cost = 2^(seq(0.5,10,.5))))
+#tuneResultsvm <- svm(Value ~ Period,  data = train, kernel = "polynomial")
+summary(tuneResultsvm$best.model)
+
+#best model selection
+tunedVals <-tuneResultsvm$best.model
+
+#best parameters selection
+tunePar<-tuneResultsvm$best.parameters
+gammaBest<-tunePar$gamma
+epsilonBest<-tunePar$epsilon
+costBest<-tunePar$cost
+
+#testing using the best model
+predictYsvm <- predict(tunedVals, test)
+
+```
+### Cumulative vaccination: SVM model performance
+```{r errors_svm}
+library(Metrics)
+#errors
+RMSE_svm<-rmse(test$Value, predictYsvm)
+MAE_svm<-mae(test$Value, predictYsvm)
+RSE_svm<-1-rse(test$Value, predictYsvm)
+
+#creating error table
+Measurement<-c("RMSE", "R-squared", "MAE")
+err_Value<-c(RMSE_svm, RSE_svm, MAE_svm)
+employ.data <- data.frame(Measurement, err_Value)
+employ.data
+```
+
+Cumulative vaccinations administered vs predicted
+
+```{r plot_test_svm}
+
+
+library(ggplot2)
+ggplot(test, aes(x=Period, y = Value, group=Label1, colour=Label1)) + 
+  geom_line() +
+  geom_point(aes(x=test$Period, y=predictYsvm),colour='blue')+
+  ggtitle("Cumulative vaccinations administered vs predicted - SVM")+
+  xlab("Week ending") +
+  ylab("Number of vaccinations administered")+
+  labs(fill = "1")+
+  theme(legend.position="top")
+
+```
+```{r plot_test_svm1}
+
+  d_svm_test <- data.frame(test$Value, predictYsvm)
+    colnames(d_svm_test) <- c("obs", "pred")
+   range <- range(c(d_svm_test$obs, d_svm_test$pred), na.rm = TRUE)
+    plot(d_svm_test, xlim = range, ylim = range, main = "Predicted versus Observed for test data")
+    abline(a = 0, b = 1, col = c("blue"), lty = c(2), lwd = c(3))
+    
+```
+
+```{r plot_test_svm2}
+
+
+  d_svm <- data.frame(train$Value, tuneResultsvm$best.model$fitted)
+  colnames(d_svm) <- c("obs", "pred")
+    d_svm$residuals <- tuneResultsvm$best.model$residuals
+    limits <- boxplot.stats(x = d_svm$residuals)$stats
+    label <- ifelse(d_svm$residuals < limits[1] | d_svm$residuals > limits[5], rownames(d_svm), NA)
+  ggplot(d_svm, mapping = aes(y = residuals, x = 0, label = label)) +
+      geom_boxplot(orientation = "vertical") +
+      labs(title = "Train-Residual Boxplot - SVM") +
+      theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.ticks.x = element_blank())
+  
+```
+
+```{r plot_test_svm3}
+
+   d_svm_test$residuals <- d_svm_test$obs - d_svm_test$pred
+    limits <- boxplot.stats(x = d_svm_test$residuals)$stats
+    label <- ifelse(d_svm_test$residuals < limits[1] | d_svm_test$residuals > limits[5], rownames(d_svm_test), NA)
+   ggplot(d_svm_test, mapping = aes(y = residuals, x = 0, label = label)) +
+      geom_boxplot(orientation = "vertical") +
+      labs(title = "Test-Residual Boxplot - SVM") +
+      theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.ticks.x = element_blank())
+    
+```
+### Cumulative vaccination: Vaccination forecast - SVM
+
+
+```{r future_prediction}
+
+#declare variable with the future dates
+vaccine_prediction_svm <- data.frame(id=1, ResourceID="CPC0V10", Period = c(    # Create example data
+                             "2021-09-05",
+                             "2021-09-12",
+                             "2021-09-19",
+                             "2021-09-26",
+                             "2021-10-03",
+                             "2021-10-10",
+                             "2021-10-17",
+                             "2021-10-24",
+                             "2021-10-31",
+                             "2021-11-07",
+                             "2021-11-14",
+                             "2021-11-21",
+                             "2021-11-28",
+                             "2021-12-05",
+                             "2021-12-12",
+                             "2021-12-19",
+                             "2021-12-26",
+                             "2022-01-02",
+                             "2022-01-09",
+                             "2022-01-16",
+                             "2022-01-23",
+                             "2022-01-30",
+                             "2022-02-06",
+                             "2022-02-13",
+                             "2022-02-20",
+                             "2022-02-27",
+                             "2022-03-06",
+                             "2022-03-13",
+                             "2022-03-20",
+                             "2022-03-27"
+                             ),
+                   Label1 = "Cumulative vaccinations forecast", Value=0, Unit="Number", Measure="Cumulative Vaccinations", Multiplier=0)
+vaccine_prediction_svm$Period <- as.Date(vaccine_prediction_svm$Period,             # Change class of date column
+                      format = "%Y-%m-%d")
+vaccine_prediction_svm$Period_Num<-as.numeric(vaccine_prediction_svm$Period)
+vaccine_prediction_svm<-vaccine_prediction_svm[order(vaccine_prediction_svm$Period),]
+
+
+#train for the whole dataset
+svm_model <- svm(Value ~ Period , gamma=gammaBest, epsilon=epsilonBest, cost=costBest, kernel = "polynomial", vaccin_adm)
+
+#prediction
+vaccine_prediction_svm$Value <- predict(svm_model, vaccine_prediction_svm)
+
+#plot the data
+library(ggplot2)
+library("ggrepel")
+ggplot()+
+  geom_point(data=vaccin_adm, aes(x=Period, y = Value, group=Label1, colour=Label1)) + 
+  geom_point(data=vaccine_prediction_svm, aes(x=Period, y = Value, group=Label1, colour=Label1))+
+  geom_hline(yintercept=7171640, linetype="dashed", color = "blue")+
+  annotate("text",x = as.Date("2021-04-07"), y = 7171640, label = "70% population", color = "blue")+
+  geom_hline(yintercept=8196160, linetype="dashed", color = "green")+
+  annotate("text",x = as.Date("2021-04-07"), y = 8196160, label = "80% population", color = "green")+
+  geom_hline(yintercept=9220680, linetype="dashed", color = "red")+
+  annotate("text",x = as.Date("2021-04-07"), y = 9220680, label = "90% population", color = "red")+
+  ylim(0, 11000000)+
+  ggtitle("Cumulative vaccinations forecast")+
+  xlab("Week ending") +
+  ylab("Number of vaccinations administered")+
+  labs(fill = "1")+
+  theme(legend.position="top")
+
+```
+
+### Cumulative vaccination: Vaccination forecast using Polynomial Regression method  
+```{r lm}
+#train model
+Result_lm <- lm(Value ~ poly(Period_Num,2), data=train)
+summary(Result_lm)
+
+#predict using testing dataset
+predictYlm <- predict(Result_lm, test)
+
+```
+### Cumulative vaccination:SVM model performance
+```{r lm_errors}
+
+#estimate errors
+RMSE_lm<-rmse(test$Value, predictYlm)
+MAE_lm<-mae(test$Value, predictYlm)
+RSE_lm<-1-rse(test$Value, predictYlm)
+
+#creating error table
+Measurement<-c("RMSE", "R-squared", "MAE")
+err_Value<-c(RMSE_lm, RSE_lm, MAE_lm)
+employ.data <- data.frame(Measurement, err_Value)
+employ.data
+```
+
+Number of vaccinated people can be calculated as **443743+1900849*X^2+600543*X**    
+
+```{r plot_prediction_lm}
+
+
+library(ggplot2)
+ggplot(test, aes(x=Period, y = Value, group=Label1, colour=Label1)) + 
+  geom_line() +
+  geom_point(aes(x=test$Period, y=predictYlm),colour='blue')+
+  ggtitle("Cumulative vaccinations Actual vs Predicted - Polynomial Regression")+
+  xlab("Week ending") +
+  ylab("Number of vaccinations administered")+
+  labs(fill = "1")+
+  theme(legend.position="top")
+
+```
+```{r plot_test_lm1}
+
+  d_lm_test <- data.frame(test$Value, predictYlm)
+    colnames(d_lm_test) <- c("obs", "pred")
+   range <- range(c(d_lm_test$obs, d_lm_test$pred), na.rm = TRUE)
+    plot(d_lm_test, xlim = range, ylim = range, main = "Predicted versus Observed for test data")
+    abline(a = 0, b = 1, col = c("blue"), lty = c(2), lwd = c(3))
+    
+```
+
+```{r plot_test_lm2}
+
+  d_lm <- data.frame(train$Value, Result_lm$model$Value)
+  colnames(d_lm) <- c("obs", "pred")
+    d_lm$residuals <- Result_lm$residuals
+    limits <- boxplot.stats(x = d_lm$residuals)$stats
+    label <- ifelse(d_lm$residuals < limits[1] | d_lm$residuals > limits[5], rownames(d_lm), NA)
+  ggplot(d_lm, mapping = aes(y = residuals, x = 0, label = label)) +
+      geom_boxplot(orientation = "vertical") +
+      labs(title = "Train-Residual Boxplot - Polynomial Regression") +
+      theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.ticks.x = element_blank())
+  
+```
+
+```{r plot_test_lm3}
+
+   d_lm_test$residuals <- d_lm_test$obs - d_lm_test$pred
+    limits <- boxplot.stats(x = d_lm_test$residuals)$stats
+    label <- ifelse(d_lm_test$residuals < limits[1] | d_lm_test$residuals > limits[5], rownames(d_lm_test), NA)
+   ggplot(d_lm_test, mapping = aes(y = residuals, x = 0, label = label)) +
+      geom_boxplot(orientation = "vertical") +
+      labs(title = "Test-Residual Boxplot - Polynomial Regression") +
+      theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.ticks.x = element_blank())
+    
+```
+
+
+### Cumulative vaccination: Vaccination forecast - lm
+
+
+```{r future_prediction_lm}
+
+#forecasting
+vaccine_prediction_lm<-vaccine_prediction_svm
+vaccine_prediction_lm$Value <- predict(Result_lm, vaccine_prediction_lm)
+
+#plot the data
+library(ggplot2)
+ggplot()+
+  geom_point(data=vaccin_adm, aes(x=Period, y = Value, group=Label1, colour=Label1)) + 
+  geom_point(data=vaccine_prediction_lm, aes(x=Period, y = Value, group=Label1, colour=Label1))+
+  geom_hline(yintercept=7171640, linetype="dashed", color = "blue")+
+  annotate("text",x = as.Date("2021-04-07"), y = 7171640, label = "70% population", color = "blue")+
+  geom_hline(yintercept=8196160, linetype="dashed", color = "green")+
+  annotate("text",x = as.Date("2021-04-07"), y = 8196160, label = "80% population", color = "green")+
+  geom_hline(yintercept=9220680, linetype="dashed", color = "red")+
+  annotate("text",x = as.Date("2021-04-07"), y = 9220680, label = "90% population", color = "red")+
+  ggtitle("Cumulative vaccinations forecast - Polynomial Regression")+
+  xlab("Week ending") +
+  ylab("Number of vaccinations administered")+
+  labs(fill = "1")+
+  theme(legend.position="top")
+
+```
+
+### Cumulative vaccination by vaccinators: Explore the dataset for a missing data
+
+For a dataset, it is important to be able to answer these questions about missing values.
+
+```{r missing1}
+library(visdat)
+library(ggplot2)
+vis_dat(Observations_CPCOV11) + ggtitle("Missing Value Distribution")
+```
+As per above there is no missing data in the dataset.
+
+
+### Cumulative vaccination by vaccinators: Plot the data
+
+
+```{r plot_vaccin}
+
+  ggplot(Observations_CPCOV11, aes(Period, Value, fill = Label1)) +
+  geom_col() +
+  ggtitle("Trained vaccinators and active vaccinators")+
+  xlab("Week ending") +
+  ylab("Number of vaccinations administered")+
+  labs(fill = "Vaccinator:")+
+  theme(legend.position="top")
+```
+Data table
+
+```{r cumulative_data_table1}
+Observations_CPCOV11
+```
+
+
+## Cumulative vaccination by vaccinators: Summary table
+```{r summary1}
+summary(Observations_CPCOV11)
+```
+
+### Cumulative vaccination by vaccinators: Explore dataset for outliers
+```{r outliers}
+coef1 <- 1.5  
+limits <- boxplot.stats(x = Observations_CPCOV11$Value, coef = coef1)$stats
+Observations_CPCOV11$label <- ifelse(Observations_CPCOV11$Value < limits[1] | Observations_CPCOV11$Value > limits[5], rownames(Observations_CPCOV11), NA)
+
+
+
+ggplot(data = Observations_CPCOV11, aes(x=Period, y=Value)) + geom_boxplot(aes(fill=Label1), coef = coef1, outlier.colour = "red")+
+  labs(title = paste("Uni-variable boxplots at IQR multiplier of", coef1))+
+  theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+```
+There are no outliers detected. 
+
+## Loading vaccinations data from the Excel file published by the Ministry of Health
+
+```{r read_excel1}
+
+library("readxl")
+Vaccin_DHB <- read_excel("covid_vaccinations.xlsx", sheet = "DHBofResidence by ethnicity")
+#drop last two columns
+Vaccin_DHB<-Vaccin_DHB[-c(9,10)]
+Vaccin_DHB$`DHB of residence`<-factor(Vaccin_DHB$`DHB of residence`)
+Vaccin_DHB$`Age group`<-factor(Vaccin_DHB$`Age group`)
+Vaccin_DHB$`Ethnic group`<-factor(Vaccin_DHB$`Ethnic group`)
+Vaccin_DHB$`First dose uptake per 1000 people`<-as.integer(Vaccin_DHB$`First dose uptake per 1000 people`)
+Vaccin_DHB
+```
+
+```{r summarytools}
+library(summarytools)
+summarytools::view(summarytools::dfSummary(Vaccin_DHB), method = "render")
+```
+
+### Homogeniety
+
+Homogeneity: the quality or state of being all the same or all of the same kind.
+
+Does the data belong together? Do the row identifiers make a logical sequence? Is there a pattern to the data in its supplied order?
+
+```{r homogeniety}
+cols <- c("First dose administered","Second dose administered","Population","First dose uptake per 1000 people","Second dose uptake per 1000 people") # choose the numeric columns
+numData <- scale(Vaccin_DHB[,cols], center = TRUE, scale = TRUE) 
+matplot(numData, type = "l", col = rainbow(ncol(numData)), xlab = "Observations in sequence", ylab = "Value") 
+```
+
+
+## Vaccination by DHB, Age Group, Ethnic Group
+
+### Vaccination by DHB, Age Group, Ethnic Group: Explore dataset for a missing data
+
+For a dataset, it is important to be able to answer these questions about missing values.
+
+```{r missing_}
+library(visdat)
+library(ggplot2)
+vis_dat(Vaccin_DHB) + ggtitle("Missing Value Distribution")
+```
+Outliers by DHB
+
+```{r outliers_DHB_firstDose}
+ggplot(data = Vaccin_DHB, aes(x=`DHB of residence`, y=`First dose uptake per 1000 people`)) + geom_boxplot(aes(fill=`DHB of residence`), outlier.colour = "red")+ 
+labs(title = paste("Uni-variable boxplots: First dose uptake per 1000 people"))+
+theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.text.x = element_text(face = "bold",angle = 90))
+```
+```{r outliers_DHB_secondDose}
+ggplot(data = Vaccin_DHB, aes(x=`DHB of residence`, y=`Second dose uptake per 1000 people`)) + geom_boxplot(aes(fill=`DHB of residence`), outlier.colour = "red")+ 
+labs(title = paste("Uni-variable boxplots: Second dose uptake per 1000 people"))+
+theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.text.x = element_text(face = "bold",angle = 90))
+```
+
+Some outliers detected for different DHB.
+
+Outliers by Age group
+
+```{r outliers_age_firstDose}
+library(ggrepel)
+ggplot(data = Vaccin_DHB, aes(x=`Age group`, y=`First dose uptake per 1000 people`)) + 
+geom_boxplot(aes(fill=`Age group`), outlier.colour = "red")+ 
+labs(title = paste("Uni-variable boxplots: First dose uptake per 1000 people"))+
+theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.text.x = element_text(face = "bold",angle = 90))
+```
+
+```{r outliers_age_secondDose}
+library(ggrepel)
+ggplot(data = Vaccin_DHB, aes(x=`Age group`, y=`Second dose uptake per 1000 people`)) + 
+geom_boxplot(aes(fill=`Age group`), outlier.colour = "red")+ 
+labs(title = paste("Uni-variable boxplots: Second dose uptake per 1000 people"))+
+theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.text.x = element_text(face = "bold",angle = 90))
+```
+Some outliers detected for different age groug. Some age groups 16-19, 20-24, 25-29, 30-34, 35-39, 40-44 are showing just higher outliers which means that age categories are showing a high number of vaccination on some DHB districts. 
+
+
+
+
+### Vaccination by DHB, Age Group, Ethnic Group: Data overview
+
+Plot the dataset using *ggplot* function
+
+```{r plot1}
+library(ggplot2)
+library(dplyr)
+
+df1 = Vaccin_DHB%>%
+  group_by(`DHB of residence`,`Age group`) %>%
+  summarise(Mean = mean(`First dose uptake per 1000 people`), Sd = sd(`First dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`DHB of residence`))
+
+
+ggplot(df1, aes(x = New_Var, y = Mean, fill = `Age group`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  ggtitle("First dose uptake per 1000 people by DHB")+
+  xlab("DHB of residence") +
+  ylab("Number of vaccines administered (mean by Age group)")
+
+
+```
+
+```{r plot11}
+
+df11 = Vaccin_DHB%>%
+  group_by(`DHB of residence`,`Ethnic group`) %>%
+  summarise(Mean = mean(`First dose uptake per 1000 people`), Sd = sd(`First dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`DHB of residence`))
+
+
+ggplot(df11, aes(x = New_Var, y = Mean, fill = `Ethnic group`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  ggtitle("First dose uptake per 1000 people by DHB")+
+  xlab("DHB of residence") +
+  ylab("Number of vaccines administered (mean by Ethnic group)")
+
+
+```
+
+```{r plot2}
+
+df2 = Vaccin_DHB%>%
+  group_by(`DHB of residence`,`Age group`) %>%
+  summarise(Mean = mean(`Second dose uptake per 1000 people`), Sd = sd(`Second dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`DHB of residence`))
+
+
+ggplot(df2, aes(x = New_Var, y = Mean, fill = `Age group`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  ggtitle("Second dose uptake per 1000 people by DHB")+
+  xlab("DHB of residence") +
+  ylab("Number of vaccines administered (mean by Age group)")
+
+
+```
+
+```{r plot22}
+
+df22 = Vaccin_DHB%>%
+  group_by(`DHB of residence`,`Ethnic group`) %>%
+  summarise(Mean = mean(`Second dose uptake per 1000 people`), Sd = sd(`Second dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`DHB of residence`))
+
+
+ggplot(df22, aes(x = New_Var, y = Mean, fill = `Ethnic group`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  ggtitle("Second dose uptake per 1000 people by DHB")+
+  xlab("DHB of residence") +
+  ylab("Number of vaccines administered (mean by Ethnic group)")
+
+
+```
+
+
+```{r plot3}
+
+df3 = Vaccin_DHB%>%
+  group_by(`Ethnic group`,`Age group`) %>%
+  summarise(Mean = mean(`First dose uptake per 1000 people`), Sd = sd(`First dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`Ethnic group`))
+
+
+ggplot(df3, aes(x = New_Var, y = Mean, fill = `Age group`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  ggtitle("First dose uptake per 1000 people by Age group")+
+  xlab("Ethnic group") +
+  ylab("Number of vaccines administered (mean by Age group)")
+
+```
+
+```{r plot33}
+
+df33 = Vaccin_DHB%>%
+  group_by(`Ethnic group`,`Age group`) %>%
+  summarise(Mean = mean(`Second dose uptake per 1000 people`), Sd = sd(`Second dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`Ethnic group`))
+
+
+ggplot(df33, aes(x = New_Var, y = Mean, fill = `Age group`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  ggtitle("Second dose uptake per 1000 people by Age Group")+
+  xlab("Ethnic group") +
+  ylab("Number of vaccines administered (mean by Age group)")
+
+```
+
+```{r plot4}
+library(scales)
+df4 = Vaccin_DHB%>%
+  group_by(`Ethnic group`) %>%
+  summarise(Mean = mean(`First dose uptake per 1000 people`), Sd = sd(`First dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`Ethnic group`))
+
+
+ggplot(df4, aes(x = "", y = Mean, fill = `Ethnic group`)) +
+  geom_bar(stat = "identity", color = "black", width = 0.7)+
+  coord_polar("y", start=0)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),legend.title = element_blank()) +
+  ggtitle("First dose uptake per 1000 people by Ethnic group")+
+  xlab(" ") +
+  ylab(" ")
+  
+```
+
+```{r plot44}
+library(scales)
+df44 = Vaccin_DHB%>%
+  group_by(`Ethnic group`) %>%
+  summarise(Mean = mean(`Second dose uptake per 1000 people`), Sd = sd(`Second dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`Ethnic group`))
+
+
+ggplot(df44, aes(x = "", y = Mean, fill = `Ethnic group`)) +
+  geom_bar(stat = "identity", color = "black", width = 0.7)+
+  coord_polar("y", start=0)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),legend.title = element_blank()) +
+  ggtitle("Second dose uptake per 1000 people by Ethnic group")+
+  xlab(" ") +
+  ylab(" ")
+  
+```
+```{r plot5}
+library(scales)
+df5 = Vaccin_DHB%>%
+  group_by(`Age group`) %>%
+  summarise(Mean = mean(`First dose uptake per 1000 people`), Sd = sd(`First dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`Age group`))
+
+
+ggplot(df5, aes(x = "", y = Mean, fill = `Age group`)) +
+  geom_bar(stat = "identity", color = "black", width = 0.7)+
+  coord_polar("y", start=0)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),legend.title = element_blank()) +
+  ggtitle("First dose uptake per 1000 people by Age group")+
+  xlab(" ") +
+  ylab("Total mean number of a first dose uptake per 1000 people")
+  
+```
+
+```{r plot55}
+library(scales)
+df55 = Vaccin_DHB%>%
+  group_by(`Age group`) %>%
+  summarise(Mean = mean(`Second dose uptake per 1000 people`), Sd = sd(`Second dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`Age group`))
+
+
+ggplot(df55, aes(x = "", y = Mean, fill = `Age group`)) +
+  geom_bar(stat = "identity", color = "black", width = 0.7)+
+  coord_polar("y", start=0)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),legend.title = element_blank()) +
+  ggtitle("Second dose uptake per 1000 people by Age group")+
+  xlab(" ") +
+  ylab("Total mean number of a second dose uptake per 1000 people")
+  
+```
+
