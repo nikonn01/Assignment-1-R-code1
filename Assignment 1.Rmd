@@ -442,7 +442,7 @@ ggplot(data = Observations_CPCOV11, aes(x=Period, y=Value)) + geom_boxplot(aes(f
 ```
 There are no outliers detected. 
 
-## Loading vaccinations data from the Excel file published by the Ministry of Health
+## DHB of Residence by ethnicity: Loading vaccinations data from the Excel file published by the Ministry of Health
 
 ```{r read_excel1}
 
@@ -453,7 +453,6 @@ Vaccin_DHB<-Vaccin_DHB[-c(9,10)]
 Vaccin_DHB$`DHB of residence`<-factor(Vaccin_DHB$`DHB of residence`)
 Vaccin_DHB$`Age group`<-factor(Vaccin_DHB$`Age group`)
 Vaccin_DHB$`Ethnic group`<-factor(Vaccin_DHB$`Ethnic group`)
-Vaccin_DHB$`First dose uptake per 1000 people`<-as.integer(Vaccin_DHB$`First dose uptake per 1000 people`)
 Vaccin_DHB
 ```
 
@@ -462,7 +461,7 @@ library(summarytools)
 summarytools::view(summarytools::dfSummary(Vaccin_DHB), method = "render")
 ```
 
-### Homogeniety
+### DHB of Residence by ethnicity: Homogeniety
 
 Homogeneity: the quality or state of being all the same or all of the same kind.
 
@@ -475,9 +474,7 @@ matplot(numData, type = "l", col = rainbow(ncol(numData)), xlab = "Observations 
 ```
 
 
-## Vaccination by DHB, Age Group, Ethnic Group
-
-### Vaccination by DHB, Age Group, Ethnic Group: Explore dataset for a missing data
+### DHB of Residence by ethnicity: : Explore dataset for a missing data
 
 For a dataset, it is important to be able to answer these questions about missing values.
 
@@ -494,7 +491,8 @@ labs(title = paste("Uni-variable boxplots: First dose uptake per 1000 people"))+
 theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.text.x = element_text(face = "bold",angle = 90))
 ```
 ```{r outliers_DHB_secondDose}
-ggplot(data = Vaccin_DHB, aes(x=`DHB of residence`, y=`Second dose uptake per 1000 people`)) + geom_boxplot(aes(fill=`DHB of residence`), outlier.colour = "red")+ 
+ggplot(data = Vaccin_DHB, aes(x=`DHB of residence`, y=`Second dose uptake per 1000 people`)) + 
+geom_boxplot(aes(fill=`DHB of residence`), outlier.colour = "red")+ 
 labs(title = paste("Uni-variable boxplots: Second dose uptake per 1000 people"))+
 theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.text.x = element_text(face = "bold",angle = 90))
 ```
@@ -521,9 +519,7 @@ theme(axis.title.y = element_blank(), axis.text.y = element_blank(), axis.ticks.
 Some outliers detected for different age groug. Some age groups 16-19, 20-24, 25-29, 30-34, 35-39, 40-44 are showing just higher outliers which means that age categories are showing a high number of vaccination on some DHB districts. 
 
 
-
-
-### Vaccination by DHB, Age Group, Ethnic Group: Data overview
+### DHB of Residence by ethnicity: : Data overview
 
 Plot the dataset using *ggplot* function
 
@@ -713,3 +709,38 @@ ggplot(df55, aes(x = "", y = Mean, fill = `Age group`)) +
   
 ```
 
+## DHB Vaccination Plan: Loading vaccinations data from the Excel file published by the Ministry of Health
+
+```{r read_excel1}
+
+library("readxl")
+Vaccin_plan_DHB <- read_excel("covid_vaccinations.xlsx", sheet = "DHB Plan Variance") #column A to be updated; total to be removed; first three rows to be removed
+
+Vaccin_plan_DHB$`DHB`<-factor(Vaccin_plan_DHB$`DHB`)
+Vaccin_plan_DHB <- Vaccin_plan_DHB %>% select(-starts_with("Cumulative"))
+Vaccin_plan_DHB
+```
+```{r summarytools1}
+library(summarytools)
+summarytools::view(summarytools::dfSummary(Vaccin_plan_DHB), method = "render")
+```
+
+```{r plot}
+vac_variance<-Vaccin_plan_DHB[which(Vaccin_plan_DHB$...2=="Variance"),] #separate variance
+vac_variance1 <- as.data.frame(t(vac_variance))
+
+
+Vaccin_plan_DHB1 <- as.data.frame(t(Vaccin_plan_DHB))
+Vaccin_plan_DHB1$Label <- paste0(Vaccin_plan_DHB1$Label, ":00")
+
+library(ggplot2)
+ggplot(Vaccin_plan_DHB, aes(x="", y = , group=DHB, colour=DHB)) + 
+  geom_line() + 
+  geom_point(size = 1)+
+  ggtitle("Cumulative vaccinations")+
+  xlab("Week ending") +
+  ylab("Number of vaccinations administered")+
+  labs(fill = "1")+
+  theme(legend.position="top")
+
+```
