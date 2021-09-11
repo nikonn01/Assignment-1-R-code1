@@ -14,7 +14,7 @@ output:
 
 To load the data we have used API published by the Stats NZ.
 Dataframe Observations_CPCOV10 contains the cumulative vaccination data around NZ.
-Dataframe Observations_CPCOV11 contains the cumulative vaccination data by vaccinator.
+Dataframe Observations_CPCOV11 contains the cumulative vaccination data by vaccinator. 
 ```{r setup}
 source("get-opendata-catalogue-fun.R")
 
@@ -62,7 +62,7 @@ Observations_CPCOV11$Period_Num<-as.numeric(Observations_CPCOV11$Period)
 Observations_CPCOV10$Label1<-factor(Observations_CPCOV10$Label1)
 Observations_CPCOV11$Label1<-factor(Observations_CPCOV11$Label1)
 ```
-Observations_CPCOV10 dataframe contains 84 observations and 9 variables. After the data is loaded there are three data types detected: character, numeric and integer. I have updated the Period to date variable and Label to factor and its cardinality is 3.
+Observations_CPCOV10 dataframe includs 84 observations and 9 variables. After the data is loaded there are three data types detected: character, numeric and integer. I have updated the Period to date variable and Label to factor and its cardinality is 3.
 
 Observations_CPCOV11 dataframe contains 56 observations and 11 variables. After the data is loaded there are three data types detected: character, numeric and integer. I have updated the Period to date variable and Label to factor and its cardinality is 2.
 
@@ -119,13 +119,13 @@ labs(title = paste("Boxplots: Cumulative vaccinations"))+
   theme(axis.title.y = element_blank(), axis.text.y = element_text(), axis.ticks.y = element_blank())
 ```
 
-Box plot allows to identify outliers for a numeric data. There are some outliers detected but because this is a cumulative data the latest observations are treated as ouliers.
+Box plot allows to identify outliers for a numeric data. There are some outliers detected but because this is a cumulative data the latest observations are treated as outliers.
 
 ### Cumulative vaccination: Split data by testing and trainign dataset
 
-To valuate the mothod performance we should split the dataset by testing and training. 
-The first 80% of data is assigned to training dataset and the last 20% is assigned to testing dataset.
-We will traing our method using training dataset and find the optimal hyper parameters to get the model. This model will be applied to the training dataset. 
+To valuate the method performance we should split the dataset by testing and training. 
+The first 80% of data is assigned to a training dataset and the last 20% is assigned to a testing dataset.
+We will traing our method using training dataset and find the optimal hyper parameters for our model. The model with the optimal hyperparameters will be applied to the training dataset. 
 
 ```{r sampling}
 #separate "Cumulative vaccinations administered" observations as we are going to do a projection just for "Cumulative vaccinations administered"
@@ -195,7 +195,7 @@ ggplot(test, aes(x=Period, y = Value, group=Label1, colour=Label1)) +
   theme(legend.position="top")
 ```
 
-As per above plot the predicted values are higher then actual at the end which means the projection will overestimate the number of vaccinations.
+As per above plot the predicted values are higher then actual at the end which means the projection could potentially overestimate the number of vaccinations.
 
 We should also check the residual outliers for our model. Residual=forecast-test or train
 
@@ -217,7 +217,7 @@ Checking the residuals outliers for training dataset:
 
 There are no residuals outliers detected in a training dataset.
 
-Checking the residuals outliers for testing dataset:
+Checking the residuals outliers for a testing dataset:
 
 ```{r plot_test_svm3}
 d_svm_test <- data.frame(test$Value, predictYsvm)
@@ -238,7 +238,7 @@ There are no residuals outliers detected in a testing dataset.
 
 ### Cumulative vaccination: Vaccination forecast - SVM
 Vaccination projection using SVM.
-We have to create a model using the whole dataset and applying the hyperparameters getting above.
+We have to create a model using the whole dataset.
 
 ```{r future_prediction}
 
@@ -329,7 +329,7 @@ predictYlm <- predict(Result_lm, test)
 
 ```
 
-As per above summary Polynomial Regression is showing a good performance on training dataset. We can check how it performs on testing dataset.
+As per above summary Polynomial Regression is showing a good performance on training dataset. We can check how it performs on a testing dataset.
 
 ### Cumulative vaccination:Polynomial Regression model performance
 ```{r lm_errors}
@@ -345,7 +345,7 @@ err_Value<-c(RMSE_lm, RSE_lm, MAE_lm)
 employ.data <- data.frame(Measurement, err_Value)
 employ.data
 ```
-Polynomial Regression model is showing s good results on the testing dataset. Also we can control the function degree adding or removing variables. The optimal number is 2 as it gives us R-squared 0.62, so our model is not overfitting.
+Polynomial Regression model is showing a good result on a testing dataset. Also we can control the function degree adding or removing variables. The optimal number is 2 as it gives us R-squared around 0.62, so our model is not overfitting.
 We can plot the predicted and testing values to see how our model behaves. 
 
 ```{r plot_prediction_lm}
@@ -398,7 +398,7 @@ d_lm_test <- data.frame(test$Value, predictYlm)
     
 ```
 
-There are no residual outliers are detected in testing dataset.
+There are no residual outliers are detected for a testing dataset.
 
 
 ### Cumulative vaccination: Vaccination forecast - lm
@@ -432,17 +432,16 @@ ggplot()+
 
 ```
 
-As per our projection using SVM: 
+As per our projection using Polynomial Regression: 
 -70% population will be vaccinated early December;
--80% population will be vaccinated in the missle of December;
+-80% population will be vaccinated in the middle of December;
 -90% population will be vaccinated in January.
 
-I think Polynomial Regression performs better than SVM as we have a model overfitting using SVM method.
+I think Polynomial Regression performs better than SVM.
 
 
 ### Cumulative vaccination by vaccinators: Explore the dataset for a missing data
 
-For a dataset, it is important to be able to answer these questions about missing values.
 
 ```{r missing1}
 library(visdat)
@@ -450,11 +449,11 @@ library(ggplot2)
 vis_dat(Observations_CPCOV11) + ggtitle("Missing Value Distribution")
 ```
 
-As per above there is no missing data in the dataset.
+As per above there is no missing data detected in the dataset.
 
 
 ### Cumulative vaccination by vaccinators: Plot the data
-Belos is a plot which is showing the vaccinations by trained or active vaccinator. 
+Below is a plot which is showing the vaccinations by trained or active vaccinator. 
 
 ```{r plot_vaccin}
 
@@ -498,7 +497,7 @@ There are no outliers detected.
 ## DHB of Residence by ethnicity: Loading vaccinations data from the Excel file published by the Ministry of Health
 To check how NZ performs with vaccination we have downloaded the dataset published by the Ministry of Health. The dataset is dated from 7 September 2021.
 
-Vaccin_DHB dataframe contains 28 observations and 9 variables. After the data is loaded there are three data types detected: character, numeric and integer. I have updated the `DHB of residence`, `Age group`, `Ethnic group`, `Gender` to factor as these variables have a low cardinality.
+Vaccin_DHB dataframe contains 28 observations and 9 variables. After the data is loaded there are three data types detected: character, numeric and integer. I have updated the `DHB of residence`, `Age group`, `Ethnic group`, `Gender` to a factor as these variables have a low cardinality.
 
 ```{r read_excel1}
 
@@ -520,7 +519,7 @@ summarytools::view(summarytools::dfSummary(Vaccin_DHB), method = "render")
 
 ### DHB of Residence by ethnicity: Homogeniety
 
-I have selected numeric variables to check the homogeniety. As per below the data belong together and there is no significant differences in the data.
+I have selected numeric variables to check the homogeniety. As per below the data belong together and there is no significant differences in the numeric data.
 
 
 ```{r homogeniety}
@@ -532,7 +531,7 @@ matplot(numData, type = "l", col = rainbow(ncol(numData)), xlab = "Observations 
 
 ### DHB of Residence by ethnicity: : Explore dataset for a missing data
 
-Plot the missing ov=bservations.
+Plot the missing observations.
 
 ```{r missing_}
 library(visdat)
@@ -561,7 +560,7 @@ theme(legend.position="down")
 ```
 
 Outliers by DHB - Second Dose
-There are some high outliers are showing for some DHB but the total number the DHB which are showing the outliers are less. Extremely high outliers can be seen for the same DHB -  Auckland Metro DHB. 
+There are some high outliers are showing for some DHB but the total number  of DHB which are showing the outliers are less for a second dose compare to the fist dose. Extremely high outliers can be seen for the same DHB -  Auckland Metro DHB. 
 ```{r outliers_DHB_secondDose}
 ggplot(data = Vaccin_DHB, aes(x=`DHB of residence`, y=`Second dose uptake per 1000 people`)) + 
 geom_boxplot(aes(fill=`DHB of residence`), outlier.colour = "red")+ 
@@ -573,7 +572,7 @@ theme(legend.position="down")
 
 
 Outliers by Age Group - First Dose
-There are some high outliers are showing for the age group from 12 to 44. Low and hight outliers are showing for the age group 45-90+. Extremely igh oulier is showing for the age group from 25 to 29. 
+There are some high outliers are showing for the age group from 12 to 44. Low and high outliers are showing for the age group 45-90+. Extremely high outlier is showing for the age group from 25 to 29. 
 
 ```{r outliers_age_firstDose}
 library(ggrepel)
