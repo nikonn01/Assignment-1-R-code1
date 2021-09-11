@@ -115,9 +115,10 @@ As per above there is no missing data detected in the dataset.
 ```{r outliers1}
 
 ggplot(data = Observations_CPCOV10, aes(x="Label", y=Value)) + geom_boxplot(aes(fill=Label1), outlier.colour = "red")+ 
-labs(title = paste("Boxplots: Cumulative vaccinations administered, Cumulative vaccinations planned, Cumulative vaccine stock received"))+
+labs(title = paste("Boxplots: Cumulative vaccinations"))+
   theme(axis.title.y = element_blank(), axis.text.y = element_text(), axis.ticks.y = element_blank())
 ```
+
 Box plot allows to identify outliers for a numeric data. There are some outliers detected but because this is a cumulative data the latest observations are treated as ouliers.
 
 ### Cumulative vaccination: Split data by testing and trainign dataset
@@ -148,7 +149,6 @@ library(Metrics)
 #train with hyperparameter tuning
 tuneResultsvm <- tune(svm, Value ~ Period,  data = train, kernel = "polynomial",
               ranges = list(gamma=2^(-1:1), epsilon = seq(0,1,0.1), cost = 2^(seq(0.5,10,.5))))
-#tuneResultsvm <- svm(Value ~ Period,  data = train, kernel = "polynomial")
 summary(tuneResultsvm$best.model)
 
 #best model selection
@@ -188,12 +188,13 @@ library(ggplot2)
 ggplot(test, aes(x=Period, y = Value, group=Label1, colour=Label1)) + 
   geom_line() +
   geom_point(aes(x=test$Period, y=predictYsvm),colour='blue')+
-  ggtitle("Cumulative vaccinations administered (tesign dataset) vs predicted values- SVM")+
+  ggtitle("Cumulative vaccinations administered vs predicted values- SVM")+
   xlab("Week ending") +
   ylab("Number of vaccinations administered")+
   labs(fill = "1")+
   theme(legend.position="top")
 ```
+
 As per above plot the predicted values are higher then actual at the end which means the projection will overestimate the number of vaccinations.
 
 We should also check the residual outliers for our model. Residual=forecast-test or train
@@ -213,6 +214,7 @@ Checking the residuals outliers for training dataset:
       theme(axis.title.x = element_blank(), axis.text.x = element_text(), axis.ticks.x = element_blank())
   
 ```
+
 There are no residuals outliers detected in a training dataset.
 
 Checking the residuals outliers for testing dataset:
@@ -231,6 +233,7 @@ d_svm_test <- data.frame(test$Value, predictYsvm)
       theme(axis.title.x = element_blank(), axis.text.x = element_text(), axis.ticks.x = element_blank())
     
 ```
+
 There are no residuals outliers detected in a testing dataset.
 
 ### Cumulative vaccination: Vaccination forecast - SVM
@@ -359,6 +362,7 @@ ggplot(test, aes(x=Period, y = Value, group=Label1, colour=Label1)) +
   theme(legend.position="top")
 
 ```
+
 We should also check the residual outliers for our model. Residual=forecast-test or train
 
 Checking the residuals outliers for training dataset:
@@ -375,7 +379,8 @@ Checking the residuals outliers for training dataset:
       theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.ticks.x = element_blank())
   
 ```
-Some upper and lover outliers are detected in training data but they are not significant. 
+
+There are no residual outliers are detected in training dataset. 
 
 Checking the residuals outliers for testing dataset:
 ```{r plot_test_lm3}
@@ -392,6 +397,7 @@ d_lm_test <- data.frame(test$Value, predictYlm)
       theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.ticks.x = element_blank())
     
 ```
+
 There are no residual outliers are detected in testing dataset.
 
 
@@ -425,6 +431,7 @@ ggplot()+
   theme(legend.position="top")
 
 ```
+
 As per our projection using SVM: 
 -70% population will be vaccinated early December;
 -80% population will be vaccinated in the missle of December;
@@ -442,6 +449,7 @@ library(visdat)
 library(ggplot2)
 vis_dat(Observations_CPCOV11) + ggtitle("Missing Value Distribution")
 ```
+
 As per above there is no missing data in the dataset.
 
 
@@ -458,6 +466,7 @@ Belos is a plot which is showing the vaccinations by trained or active vaccinato
   labs(fill = "Vaccinator:")+
   theme(legend.position="top")
 ```
+
 Data table
 
 ```{r cumulative_data_table1}
@@ -483,6 +492,7 @@ ggplot(data = Observations_CPCOV11, aes(x="Label1", y=Value)) + geom_boxplot(aes
   labs(title = paste("Uni-variable boxplots at IQR multiplier of", coef1))+
   theme(axis.title.y = element_blank(), axis.text.y = element_text(), axis.ticks.y = element_blank())
 ```
+
 There are no outliers detected. 
 
 ## DHB of Residence by ethnicity: Loading vaccinations data from the Excel file published by the Ministry of Health
@@ -529,6 +539,7 @@ library(visdat)
 library(ggplot2)
 vis_dat(Vaccin_DHB) + ggtitle("Missing Value Distribution")
 ```
+
 There is no missing data in the dataset.
 
 ## Novelties
@@ -548,6 +559,7 @@ labs(title = paste("Boxplots: First dose uptake per 1000 people"))+
 theme(axis.title.y = element_blank(), axis.text.y = element_text(face = "bold"), axis.ticks.y = element_blank(), axis.text.x = element_text(face = "bold",angle = 90))+
 theme(legend.position="down")
 ```
+
 Outliers by DHB - Second Dose
 There are some high outliers are showing for some DHB but the total number the DHB which are showing the outliers are less. Extremely high outliers can be seen for the same DHB -  Auckland Metro DHB. 
 ```{r outliers_DHB_secondDose}
@@ -571,6 +583,7 @@ labs(title = paste("Boxplots: First dose uptake per 1000 people"))+
 theme(axis.title.y = element_blank(), axis.text.y = element_text(face = "bold"), axis.ticks.y = element_blank(), axis.text.x = element_text(face = "bold",angle = 90))+
 theme(legend.position="down")
 ```
+
 Outliers by Age Group - Second Dose
 There is not a big difference between outliers for the first and second dose by the Age Group. Basically the picture is pretty the same. 
 ```{r outliers_age_secondDose}
@@ -627,7 +640,7 @@ ggplot(df1, aes(x = New_Var, y = Mean, fill = `Age_Group_min`)) +
   legend.title = element_blank()) +
   ggtitle("First dose uptake per 1000 people by DHB for different Age Groups")+
   xlab("DHB of residence") +
-  ylab("Number of vaccines administered (mean by Age group)")
+  ylab("Number of vaccines admin (mean by Age group)")
 
 
 ```
@@ -646,7 +659,7 @@ ggplot(df11, aes(x = New_Var, y = Mean, fill = `Ethnic group`)) +
   legend.title = element_blank()) +
   ggtitle("First dose uptake per 1000 people by DHB for different Ethnicity")+
   xlab("DHB of residence") +
-  ylab("Number of vaccines administered (mean by Ethnic group)")
+  ylab("Number of vaccines admin (mean by Ethnic group)")
 
 
 ```
@@ -665,7 +678,7 @@ ggplot(df2, aes(x = New_Var, y = Mean, fill = `Age_Group_min`)) +
   legend.title = element_blank()) +
   ggtitle("Second dose uptake per 1000 people by DHB for different Age Group")+
   xlab("DHB of residence") +
-  ylab("Number of vaccines administered (mean by Age group)")
+  ylab("Number of vaccines admin (mean by Age group)")
 
 
 ```
@@ -684,7 +697,7 @@ ggplot(df22, aes(x = New_Var, y = Mean, fill = `Ethnic group`)) +
   legend.title = element_blank()) +
   ggtitle("Second dose uptake per 1000 people by DHB for different Ethnicity")+
   xlab("DHB of residence") +
-  ylab("Number of vaccines administered (mean by Ethnic group)")
+  ylab("Number of vaccines admin (mean by Ethnic group)")
 
 
 ```
@@ -704,7 +717,7 @@ ggplot(df3, aes(x = New_Var, y = Mean, fill = `Age_Group_min`)) +
   legend.title = element_blank()) +
   ggtitle("First dose uptake per 1000 people by Age group")+
   xlab("Ethnic group") +
-  ylab("Number of vaccines administered (mean by Age group)")
+  ylab("Number of vaccines admin (mean by Age group)")
 
 ```
 
@@ -722,7 +735,7 @@ ggplot(df33, aes(x = New_Var, y = Mean, fill = `Age_Group_min`)) +
   legend.title = element_blank()) +
   ggtitle("Second dose uptake per 1000 people by Age Group")+
   xlab("Ethnic group") +
-  ylab("Number of vaccines administered (mean by Age group)")
+  ylab("Number of vaccines admin (mean by Age group)")
 
 ```
 ```{r plot6}
@@ -739,7 +752,7 @@ ggplot(df6, aes(x = New_Var, y = Mean, fill = `Gender`)) +
   legend.title = element_blank()) +
   ggtitle("First dose uptake per 1000 people by DHB for different Gender")+
   xlab("DHB of residence") +
-  ylab("Number of vaccines administered (mean by Gender)")
+  ylab("Number of vaccines admin (mean by Gender)")
 
 ```
 
@@ -757,7 +770,7 @@ ggplot(df66, aes(x = New_Var, y = Mean, fill =`Gender`)) +
   legend.title = element_blank()) +
   ggtitle("Second dose uptake per 1000 people by DHB for different Gender")+
   xlab("DHB of residence") +
-  ylab("Number of vaccines administered (mean by Gender)")
+  ylab("Number of vaccines admin (mean by Gender)")
 
 ```
 ```{r plot7}
@@ -774,7 +787,7 @@ ggplot(df7, aes(x = New_Var, y = Mean, fill = `Gender`)) +
   legend.title = element_blank()) +
   ggtitle("First dose uptake per 1000 people by Ethnicity for different Gender")+
   xlab("Ethnic group") +
-  ylab("Number of vaccines administered (mean by Gender)")
+  ylab("Number of vaccines admin (mean by Gender)")
 
 ```
 
@@ -792,7 +805,7 @@ ggplot(df77, aes(x = New_Var, y = Mean, fill =`Gender`)) +
   legend.title = element_blank()) +
   ggtitle("Second dose uptake per 1000 people by Ethnicity for different Gender")+
   xlab("Ethnic group") +
-  ylab("Number of vaccines administered (mean by Gender)")
+  ylab("Number of vaccines admin (mean by Gender)")
 
 ```
 
@@ -810,7 +823,7 @@ ggplot(df8, aes(x = New_Var, y = Mean, fill = `Gender`)) +
   legend.title = element_blank()) +
   ggtitle("First dose uptake per 1000 people by Age Group for different Gender")+
   xlab("Age group") +
-  ylab("Number of vaccines administered (mean by Gender)")
+  ylab("Number of vaccines admin (mean by Gender)")
 
 ```
 
@@ -828,7 +841,7 @@ ggplot(df88, aes(x = New_Var, y = Mean, fill =`Gender`)) +
   legend.title = element_blank()) +
   ggtitle("Second dose uptake per 1000 people by Age Group for different Gender")+
   xlab("Age group") +
-  ylab("Number of vaccines administered (mean by Age group)")
+  ylab("Number of vaccines admin (mean by Age group)")
 
 ```
 
@@ -876,7 +889,7 @@ ggplot(df4a, aes(x = New_Var, y =Sum/pop, fill =`Ethnic group`)) +
   theme(axis.text.x = element_text(face = "bold",angle = 90),
   legend.title = element_blank()) +
   scale_y_continuous(labels=scales::percent) +
-  ggtitle("First dose vaccinatination administered in % of a total pupolation by Ethnicity for all DHB")+
+  ggtitle("First dose dose vaccin admin in % of a total pupolation by Ethnicity for all DHB")+
   xlab("Ethnic Group") +
   ylab("First dose administered, %")
 
@@ -895,7 +908,7 @@ ggplot(df44a, aes(x = New_Var, y =Sum/pop, fill =`Ethnic group`)) +
   theme(axis.text.x = element_text(face = "bold",angle = 90),
   legend.title = element_blank()) +
   scale_y_continuous(labels=scales::percent) +
-  ggtitle("Second dose vaccinatination administered in % of a total pupolation by Ethnicity for all DHB")+
+  ggtitle("Second dose vaccin admin in % of a total pupolation by Ethnicity for all DHB")+
   xlab("Ethnic Group") +
   ylab("Second dose administered, %")
   
