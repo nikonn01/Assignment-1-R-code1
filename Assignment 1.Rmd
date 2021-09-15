@@ -82,7 +82,9 @@ ggplot(Observations_CPCOV10, aes(x=Period, y = Value, group=Label1, colour=Label
   xlab("Week ending") +
   ylab("Number of vaccinations administered")+
   labs(fill = "1")+
-  theme(legend.position="top")
+  theme(legend.position="top")+
+  scale_y_continuous(labels = scales::comma)+
+  scale_x_date(date_labels = "%b %d", date_breaks = "1 month")
 
 ```
 
@@ -116,7 +118,8 @@ As per above there is no missing data detected in the dataset.
 
 ggplot(data = Observations_CPCOV10, aes(x="Label", y=Value)) + geom_boxplot(aes(fill=Label1), outlier.colour = "red")+ 
 labs(title = paste("Boxplots: Cumulative vaccinations"))+
-  theme(axis.title.y = element_blank(), axis.text.y = element_text(), axis.ticks.y = element_blank())
+  theme(axis.title.y = element_blank(), axis.text.y = element_text(), axis.ticks.y = element_blank())+
+  scale_y_continuous(labels = scales::comma)
 ```
 
 Box plot allows to identify outliers for a numeric data. There are some outliers detected but because this is a cumulative data the latest observations are treated as outliers.
@@ -174,25 +177,29 @@ RSE_svm<-1-rse(test$Value, predictYsvm)
 
 #creating error table
 Measurement<-c("RMSE", "R-squared", "MAE")
-err_Value<-c(RMSE_svm, RSE_svm, MAE_svm)
+err_Value<-c(round(RMSE_svm,2), round(RSE_svm,2), round(MAE_svm,2))
 employ.data <- data.frame(Measurement, err_Value)
 employ.data
 ```
-Above table is sowing the SVM performs too good and there is a high risk of overfitting. 
+Above table is showing the SVM performs too good and there is a high risk of overfitting. 
 We can plot the predicted and testing values to see how our model behaves.
 
 ```{r plot_test_svm}
 
 
 library(ggplot2)
-ggplot(test, aes(x=Period, y = Value, group=Label1, colour=Label1)) + 
-  geom_line() +
-  geom_point(aes(x=test$Period, y=predictYsvm),colour='blue')+
-  ggtitle("Cumulative vaccinations administered vs predicted values- SVM")+
+ggplot()+
+  geom_line(data=test, aes(x=Period, y = Value, group=Label1, colour=Label1)) + 
+  geom_point(aes(x=test$Period, y=test$Value), colour='red')+
+  geom_line(aes(x=test$Period, y=predictYsvm,colour='Cumulative vaccinations predicted'))+
+  geom_point(aes(x=test$Period, y=predictYsvm), colour='blue')+
+  ggtitle("Cumulative vaccinations administered vs predicted values - SVM")+
   xlab("Week ending") +
-  ylab("Number of vaccinations administered")+
+  ylab("Number of vaccinations")+
   labs(fill = "1")+
-  theme(legend.position="top")
+  theme(legend.position="top")+
+  scale_y_continuous(labels = scales::comma)+
+  scale_x_date(date_labels = "%b %d", date_breaks = "1 week")
 ```
 
 As per above plot the predicted values are higher then actual at the end which means the projection could potentially overestimate the number of vaccinations.
@@ -211,7 +218,8 @@ Checking the residuals outliers for training dataset:
   ggplot(d_svm, mapping = aes(y = residuals, x = 0, label = label)) +
       geom_boxplot(orientation = "vertical") +
       labs(title = "Train-Residual Boxplot - SVM") +
-      theme(axis.title.x = element_blank(), axis.text.x = element_text(), axis.ticks.x = element_blank())
+      theme(axis.title.x = element_blank(), axis.text.x = element_text(), axis.ticks.x = element_blank())+
+      scale_y_continuous(labels = scales::comma)
   
 ```
 
@@ -230,7 +238,8 @@ d_svm_test <- data.frame(test$Value, predictYsvm)
    ggplot(d_svm_test, mapping = aes(y = residuals, x = 0, label = label)) +
       geom_boxplot(orientation = "vertical") +
       labs(title = "Test-Residual Boxplot - SVM") +
-      theme(axis.title.x = element_blank(), axis.text.x = element_text(), axis.ticks.x = element_blank())
+      theme(axis.title.x = element_blank(), axis.text.x = element_text(), axis.ticks.x = element_blank())+
+      scale_y_continuous(labels = scales::comma)
     
 ```
 
@@ -300,12 +309,13 @@ ggplot()+
   annotate("text",x = as.Date("2021-04-07"), y = 8196160, label = "80% population", color = "green")+
   geom_hline(yintercept=9220680, linetype="dashed", color = "red")+
   annotate("text",x = as.Date("2021-04-07"), y = 9220680, label = "90% population", color = "red")+
-  ylim(0, 11000000)+
+  scale_y_continuous(limits=c(0,11000000), labels = scales::comma)+
   ggtitle("Cumulative vaccinations forecast - SVM")+
   xlab("Week ending") +
   ylab("Number of vaccinations administered")+
   labs(fill = "1")+
   theme(legend.position="top")
+  
 
 ```
 
@@ -341,7 +351,7 @@ RSE_lm<-1-rse(test$Value, predictYlm)
 
 #creating error table
 Measurement<-c("RMSE", "R-squared", "MAE")
-err_Value<-c(RMSE_lm, RSE_lm, MAE_lm)
+err_Value<-c(round(RMSE_lm,2), round(RSE_lm,2), round(MAE_lm,2))
 employ.data <- data.frame(Measurement, err_Value)
 employ.data
 ```
@@ -352,14 +362,19 @@ We can plot the predicted and testing values to see how our model behaves.
 
 
 library(ggplot2)
-ggplot(test, aes(x=Period, y = Value, group=Label1, colour=Label1)) + 
-  geom_line() +
-  geom_point(aes(x=test$Period, y=predictYlm),colour='blue')+
-  ggtitle("Cumulative vaccinations Actual vs Predicted - Polynomial Regression")+
+ggplot()+
+  geom_line(data=test, aes(x=Period, y = Value, group=Label1, colour=Label1)) + 
+  geom_point(aes(x=test$Period, y=test$Value), colour='red')+
+  geom_line(aes(x=test$Period, y=predictYlm,colour='Cumulative vaccinations predicted'))+
+  geom_point(aes(x=test$Period, y=predictYlm), colour='blue')+
+  ggtitle("Cumulative vaccinations administered vs predicted values - Polynomial Regression")+
   xlab("Week ending") +
-  ylab("Number of vaccinations administered")+
+  ylab("Number of vaccinations")+
   labs(fill = "1")+
-  theme(legend.position="top")
+  theme(legend.position="top")+
+  scale_y_continuous(labels = scales::comma)+
+  scale_x_date(date_labels = "%b %d", date_breaks = "1 week")
+
 
 ```
 
@@ -394,7 +409,8 @@ d_lm_test <- data.frame(test$Value, predictYlm)
    ggplot(d_lm_test, mapping = aes(y = residuals, x = 0, label = label)) +
       geom_boxplot(orientation = "vertical") +
       labs(title = "Test-Residual Boxplot - Polynomial Regression") +
-      theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.ticks.x = element_blank())
+      theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.ticks.x = element_blank())+
+      scale_y_continuous(labels = scales::comma)
     
 ```
 
@@ -424,11 +440,12 @@ ggplot()+
   geom_hline(yintercept=9220680, linetype="dashed", color = "red")+
   annotate("text",x = as.Date("2021-04-07"), y = 9220680, label = "90% population", color = "red")+
   ggtitle("Cumulative vaccinations forecast - Polynomial Regression")+
-  ylim(0, 11000000)+
+  scale_y_continuous(limits=c(0,11000000), labels = scales::comma)+ 
   xlab("Week ending") +
   ylab("Number of vaccinations administered")+
   labs(fill = "1")+
   theme(legend.position="top")
+  
 
 ```
 
@@ -519,7 +536,7 @@ summarytools::view(summarytools::dfSummary(Vaccin_DHB), method = "render")
 
 ### DHB of Residence by ethnicity: Homogeniety
 
-I have selected numeric variables to check the homogeniety. As per below the data belong together and there is no significant differences in the numeric data.
+I have selected numeric variables to check the homogeniety. As per below the data belongs together and there is no significant differences in the numeric data.
 
 
 ```{r homogeniety}
@@ -544,13 +561,36 @@ There is no missing data in the dataset.
 ## Novelties
 
 Outliers by DHB - First Dose
-There are some high outliers are showing for some DHB. Extremely high outliers can be seen for Auckland Metro DHB. 
+
+
+To keep the dataset clear I will remove the rows with the various or unknown data:
+- DHB of residence - 'Various', 'Overseas / Unknown';
+- Ethnic group - 'Unknown' and 'Various';
+- Age group - 'Various';
+- Gender - 'Unknown/Other', 'Various'; 
+
+```{r dataset_clean}
+Vaccin_DHB<-filter(Vaccin_DHB, 
+                    Vaccin_DHB$`DHB of residence`!="Various",
+                   Vaccin_DHB$`DHB of residence`!="Overseas / Unknown",
+                    Vaccin_DHB$`Ethnic group`!="Unknown",
+                    Vaccin_DHB$`Ethnic group`!="Various",
+                    Vaccin_DHB$`Age group`!="Various",
+                    Vaccin_DHB$Gender!="Unknown/Other",
+                    Vaccin_DHB$Gender!="Various")
+
+```
+Some DHBs have over 1000 vaccinated people per 1000 population because people from another DHBs can be vaccinated there. We decided to adjust all values over 1000 to 1000. 
+
+```{r dataset_adjust}
+
+
+Vaccin_DHB$`First dose uptake per 1000 people`[Vaccin_DHB$`First dose uptake per 1000 people` >1000] <- 1000
+Vaccin_DHB$`Second dose uptake per 1000 people`[Vaccin_DHB$`Second dose uptake per 1000 people` >1000] <- 1000
+
+```
+
 ```{r outliers_DHB_firstDose}
-#coef <- 1.5
-#limits <- boxplot.stats(x = Vaccin_DHB$`First dose uptake per 1000 people`, coef = coef)$stats
-
-#Vaccin_DHB$label <- ifelse(Vaccin_DHB$`First dose uptake per 1000 people` < limits[1] | Vaccin_DHB$`First dose uptake per 1000 people` > limits[5], rownames(Vaccin_DHB), NA)
-
 ggplot(data = Vaccin_DHB, aes(x=`DHB of residence`, y=`First dose uptake per 1000 people`)) + 
 geom_boxplot(aes(fill=`DHB of residence`), outlier.colour = "red")+ 
 #ggrepel::geom_label_repel() +
@@ -560,7 +600,7 @@ theme(legend.position="down")
 ```
 
 Outliers by DHB - Second Dose
-There are some high outliers are showing for some DHB but the total number  of DHB which are showing the outliers are less for a second dose compare to the fist dose. Extremely high outliers can be seen for the same DHB -  Auckland Metro DHB. 
+
 ```{r outliers_DHB_secondDose}
 ggplot(data = Vaccin_DHB, aes(x=`DHB of residence`, y=`Second dose uptake per 1000 people`)) + 
 geom_boxplot(aes(fill=`DHB of residence`), outlier.colour = "red")+ 
@@ -572,8 +612,8 @@ theme(legend.position="down")
 
 
 Outliers by Age Group - First Dose
-There are some high outliers are showing for the age group from 12 to 44. Low and high outliers are showing for the age group 45-90+. Extremely high outlier is showing for the age group from 25 to 29. 
 
+Low outliers are showing for the age group 55-90+. 
 ```{r outliers_age_firstDose}
 library(ggrepel)
 ggplot(data = Vaccin_DHB, aes(x=`Age group`, y=`First dose uptake per 1000 people`)) + 
@@ -584,7 +624,8 @@ theme(legend.position="down")
 ```
 
 Outliers by Age Group - Second Dose
-There is not a big difference between outliers for the first and second dose by the Age Group. Basically the picture is pretty the same. 
+
+ 
 ```{r outliers_age_secondDose}
 library(ggrepel)
 ggplot(data = Vaccin_DHB, aes(x=`Age group`, y=`Second dose uptake per 1000 people`)) + 
@@ -910,6 +951,23 @@ ggplot(df44a, aes(x = New_Var, y =Sum/pop, fill =`Ethnic group`)) +
   ggtitle("Second dose vaccin admin in % of a total pupolation by Ethnicity for all DHB")+
   xlab("Ethnic Group") +
   ylab("Second dose administered, %")
+  
+```
+
+```{r plot44b}
+
+df4a$name <-"First dose administered"
+df44a$name <-"Second dose administered"
+d<-rbind(df4a, df44a)
+
+ggplot(d, aes(x = New_Var, y =Sum/pop, fill =`name`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  scale_y_continuous(labels=scales::percent) +
+  ggtitle("Vaccin admin in % of a total pupolation by Ethnicity for all DHB")+
+  xlab("Ethnic Group") +
+  ylab("Dose administered, %")
   
 ```
 ```{r plot5}
