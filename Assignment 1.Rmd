@@ -187,7 +187,7 @@ tmap_mode("plot")
 ## tmap mode set to plotting
 tm1<-tm_shape(nz) +
 tm_fill() +
-tm_bubbles(size="First dose administered", col="yellow", size.lim=c(0, 2e7))+
+tm_bubbles(size="First dose administered", col="yellow", size.lim=c(0, 2e7),  border.col = "yellow")+
   tm_borders("white", lwd = .5) +
   tm_layout(bg.color = "skyblue", inner.margins = c(0, .02, .02, .02))+
   tm_text(text = "First dose administered_adj", size = 0.7, remove.overlap = TRUE )
@@ -195,7 +195,7 @@ tm_bubbles(size="First dose administered", col="yellow", size.lim=c(0, 2e7))+
 
 tm2 <-tm_shape(nz) +
 tm_fill() +
-tm_bubbles(size="Second dose administered", col="green", size.lim=c(0, 2e7))+
+tm_bubbles(size="Second dose administered", col="green", size.lim=c(0, 2e7), border.col = "green")+
   tm_borders("white", lwd = .5) +
   tm_layout(bg.color = "skyblue", inner.margins = c(0, .02, .02, .02))+
   tm_text(text = "Second dose administered_adj", size = 0.7, remove.overlap = TRUE)
@@ -209,7 +209,7 @@ tmap_mode("plot")
 ## tmap mode set to plotting
 tm2<-tm_shape(nz) +
 tm_fill() +
-tm_bubbles(size="First dose administered %", col="yellow", size.lim=c(0, 2e7))+
+tm_bubbles(size="First dose administered %", col="yellow", size.lim=c(0, 2e7), border.col = "yellow")+
   tm_borders("white", lwd = .5) +
   tm_layout(bg.color = "skyblue", inner.margins = c(0, .02, .02, .02))+
   tm_text(text = "First dose administered % ", size = 0.7, remove.overlap = TRUE )
@@ -217,7 +217,7 @@ tm_bubbles(size="First dose administered %", col="yellow", size.lim=c(0, 2e7))+
 
 tm3 <-tm_shape(nz) +
 tm_fill() +
-tm_bubbles(size="Second dose administered %", col="green", size.lim=c(0, 2e7))+
+tm_bubbles(size="Second dose administered %", col="green", size.lim=c(0, 2e7), border.col = "green")+
   tm_borders("white", lwd = .5) +
   tm_layout(bg.color = "skyblue", inner.margins = c(0, .02, .02, .02))+
   tm_text(text = "Second dose administered % ", size = 0.7, remove.overlap = TRUE)
