@@ -654,7 +654,7 @@ Vaccin_admin <- data.frame(Label2, Vaccin)
 
 ggplot(Vaccin_admin, aes(x = "", y =Vaccin, fill =`Label2`)) +
   geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  theme(axis.text.x = element_text(face = "bold"),
   legend.title = element_blank()) +
   #scale_y_continuous(labels=scales::percent) +
   ggtitle("% of doses administered around NZ")+
