@@ -254,7 +254,6 @@ We have to create a model using the whole dataset.
 #creating the dataframe for projection 
 vaccine_prediction_svm <- data.frame(id=1, ResourceID="CPC0V10", Period = c(    # Create example data
                             
-                             "2021-09-12",
                              "2021-09-19",
                              "2021-09-26",
                              "2021-10-03",
@@ -634,6 +633,42 @@ labs(title = paste("Boxplots: Second dose uptake per 1000 people"))+
 theme(axis.title.y = element_blank(), axis.text.y = element_text(face = "bold"), axis.ticks.y = element_blank(), axis.text.x = element_text(face = "bold",angle = 90))+
   theme(legend.position="down")
 ```
+### Total Vaccinations
+Data in this section is as at 11:59pm 16 September 2021 and is updated each week day (Monday to Friday).
+
+```{r plot102}
+
+
+library(scales)
+#df102 = Vaccin_DHB%>%
+#  summarise(Sum_first = sum(`First dose administered`), Sum_second = sum(`Second dose administered`), pop=sum(`Population`) )
+
+Population=sum(Vaccin_DHB$`Population`) 
+Sum_first<-(percent(sum(Vaccin_DHB$`First dose administered`)/Population))
+Sum_second<-(percent(sum(Vaccin_DHB$`Second dose administered`)/Population))
+Label2<-c("First dose administered", "Second dose administered")
+Vaccin<-c(Sum_first, Sum_second)
+Vaccin_admin <- data.frame(Label2, Vaccin)
+
+
+
+ggplot(Vaccin_admin, aes(x = "", y =Vaccin, fill =`Label2`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  #scale_y_continuous(labels=scales::percent) +
+  ggtitle("% of doses administered around NZ")+
+  coord_flip()+
+  xlab("First/Second dose") +
+  ylab("% of doses administered")
+```
+
+Definitions:
+Cumulative total: All vaccinations that have been administered and entered into the COVID-19 Immunisation Register up until midnight of the night before the data is published.
+Eligible population vaccinated %: Vaccinations administered divided by HSU population estimates for the eligible population (12+).
+Total population vaccinated %: Vaccinations administered divided by HSU population estimates for the total population (0+).
+Vaccinated or booked: Count of individuals who have either received their vaccination or have booked via Book My Vaccine to receive a vaccination.
+Eligible vaccinated or booked %: Count of individuals who have either received their vaccination or have booked via Book My Vaccine to receive a vaccination divided by HSU population estimates for the eligible population (12+).
 
 ### DHB of Residence by ethnicity: Data overview
 
@@ -1132,7 +1167,7 @@ nz <- left_join(nz, df101, by = "Name", all=TRUE)
 
 tmap_mode("plot")
 ## tmap mode set to plotting
-tm_shape(nz) +
+tm1<-tm_shape(nz) +
 tm_fill() +
 tm_bubbles(size="First dose administered", col="red", size.lim=c(0, 2e7))+
   tm_borders("white", lwd = .5) +
@@ -1141,7 +1176,7 @@ tm_bubbles(size="First dose administered", col="red", size.lim=c(0, 2e7))+
 tm2 <-tm_shape(nz) +
 tm_polygons("First dose administered", title = "First dose administered", palette = "Blues", contrast = 0.7, border.col = "gray30", id = "Name")
 
-#tmap_arrange(tm1)
+tmap_arrange(tm1)
 
 ```
 ```{r plot101a}
