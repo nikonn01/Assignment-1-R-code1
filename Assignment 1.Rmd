@@ -8,13 +8,757 @@ output:
     toc_depth: '2'
     df_print: paged
 ---
-## Loading vaccinations data from STATS NZ using API
 
-### Explanatory data analysis of loaded datasets
+## Introducation
+
+The purpose of this report is:
+
+- Statistics about the rollout of COVID-19 vaccines in New Zealand;
+
+- COVID-19 vaccination project for NZ.
+
+I have used two datasource for this report. 
+
+The first datasource is the data provided by the Ministry of Health. Data file has been downloaded from the [Ministry of Health](https://www.health.govt.nz/our-work/diseases-and-conditions/covid-19-novel-coronavirus/covid-19-data-and-statistics/covid-19-vaccine-data) web site.
+
+The second datasource is STANS NZ web site. To load data from STATS NZ I have used API.
+
+
+## Statistics about the rollout of COVID-19 vaccines in New Zealand
+To check how NZ performs with vaccination we have downloaded the dataset published by the Ministry of Health. The dataset is dated from 14 September 2021.
+
+Vaccin_DHB dataframe contains 2676 observations and 9 variables. After the data is loaded there are three data types detected: character, numeric and integer. I have updated the `DHB of residence`, `Age group`, `Ethnic group`, `Gender` to a factor as these variables have a low cardinality.
+
+```{r read_excel1}
+
+library("readxl")
+Vaccin_DHB <- read_excel("covid_vaccinations.xlsx", sheet = "DHBofResidence by ethnicity")
+#drop last two columns
+Vaccin_DHB<-Vaccin_DHB[-c(10,11)]
+Vaccin_DHB$`DHB of residence`<-factor(Vaccin_DHB$`DHB of residence`)
+Vaccin_DHB$`Age group`<-factor(Vaccin_DHB$`Age group`)
+Vaccin_DHB$`Ethnic group`<-factor(Vaccin_DHB$`Ethnic group`)
+Vaccin_DHB$`Gender`<-factor(Vaccin_DHB$`Gender`)
+Vaccin_DHB
+```
+Dataframe summary
+
+```{r summarytools}
+library(summarytools)
+summarytools::view(summarytools::dfSummary(Vaccin_DHB), method = "render")
+```
+
+### DHB of Residence by ethnicity: Homogeniety
+
+I have selected numeric variables to check the homogeniety. As per below the data belongs together and there is no significant differences in the numeric data.
+
+
+```{r homogeniety}
+cols <- c("First dose administered","Second dose administered","Population","First dose uptake per 1000 people","Second dose uptake per 1000 people") # choose the numeric columns
+numData <- scale(Vaccin_DHB[,cols], center = TRUE, scale = TRUE) 
+matplot(numData, type = "l", col = rainbow(ncol(numData)), xlab = "Observations in sequence", ylab = "Value") 
+```
+
+
+### DHB of Residence by ethnicity: : Explore dataset for a missing data
+
+Plot the missing observations.
+
+```{r missing_}
+library(visdat)
+library(ggplot2)
+vis_dat(Vaccin_DHB) + ggtitle("Missing Value Distribution")
+```
+
+There is no missing data in the dataset.
+
+### Total Vaccinations
+
+Lets start the report from showing the percentage of people received the first and second dose in NZ.
+
+```{r plot102}
+
+
+library(scales)
+
+Population=sum(Vaccin_DHB$`Population`) 
+Sum_first<-(percent(sum(Vaccin_DHB$`First dose administered`)/Population))
+Sum_second<-(percent(sum(Vaccin_DHB$`Second dose administered`)/Population))
+Label2<-c("First dose administered", "Second dose administered")
+Vaccin<-c(Sum_first, Sum_second)
+Vaccin_admin <- data.frame(Label2, Vaccin)
+
+
+
+ggplot(Vaccin_admin, aes(x = "", y =Vaccin, fill =`Label2`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold"),
+  legend.title = element_blank()) +
+  #scale_y_continuous(labels=scales::percent) +
+  ggtitle("Doses administered around NZ")+
+  coord_flip()+
+  xlab("First/Second dose") +
+  ylab("Total population vaccinated %")
+```
+
+**Definitions:**
+
+**Cumulative total:** All vaccinations that have been administered and entered into the COVID-19 Immunisation Register up until midnight of the night before the data is published.
+
+**Total population vaccinated %:** Vaccinations administered divided by HSU population estimates for the total population (0+).
+
+Below we can see how each region performs with the Covid-19 vaccination around NZ.
+
+```{r plot101}
+library(sf)
+library(raster)
+library(dplyr)
+library(spData)
+#library(spDataLarge)
+library(tmap)
+library(dplyr)
+data(nz, land)
+
+
+
+Vaccin_DHB<-Vaccin_DHB %>%
+  mutate(Name = case_when(
+    grepl("Auckland Metro", as.character(`DHB of residence`)) ~ "Auckland",
+    grepl("Bay of Plenty", as.character(`DHB of residence`)) ~ "Bay of Plenty",
+    grepl("Canterbury", as.character(`DHB of residence`)) ~ "Canterbury",
+    grepl("Capital & Coast and Hutt Valley", as.character(`DHB of residence`)) ~ "Wellington",
+    grepl("Hawkes Bay", as.character(`DHB of residence`)) ~ "Hawke's Bay",
+    grepl("Lakes", as.character(`DHB of residence`)) ~ "Bay of Plenty",
+    grepl("MidCentral", as.character(`DHB of residence`)) ~ "Manawatu-Wanganui",
+    grepl("Nelson Marlborough", as.character(`DHB of residence`)) ~ "Tasman",
+    grepl("Northland", as.character(`DHB of residence`)) ~ "Northland",
+    grepl("South Canterbury", as.character(`DHB of residence`)) ~ "Canterbury",
+    grepl("Southern", as.character(`DHB of residence`)) ~ "Southland",
+    grepl("Tairawhiti", as.character(`DHB of residence`)) ~ "Gisborne",
+    grepl("Taranaki", as.character(`DHB of residence`)) ~ "Taranaki",
+    grepl("Waikato", as.character(`DHB of residence`)) ~ "Waikato",
+    grepl("Wairarapa", as.character(`DHB of residence`)) ~ "Wellington",
+    grepl("West Coast", as.character(`DHB of residence`)) ~ "West Coast",
+    grepl("Whanganui", as.character(`DHB of residence`)) ~ "Manawatu-Wanganui"
+    ))
+
+Vaccin_DHB$Name<-factor(Vaccin_DHB$Name)
+df101sum<-sum(Vaccin_DHB$`First dose administered`)
+
+df101 = Vaccin_DHB%>%
+  group_by(`Name`) %>%
+  summarise(`First dose administered` = sum(`First dose administered`), 'First dose administered %'=100* (sum(`First dose administered`)/sum(Population)), 'First dose administered % '= percent(sum(`First dose administered`)/sum(Population)))%>%
+  mutate(New_Var = paste0(`Name`))
+
+
+nz <- left_join(nz, df101, by = "Name", all=TRUE)
+
+
+df101a = Vaccin_DHB%>%
+  group_by(`Name`) %>%
+  summarise(`Second dose administered` = sum(`Second dose administered`), 'Second dose administered %'=100* (sum(`Second dose administered`)/sum(Population)),'Second dose administered % '= percent(sum(`Second dose administered`)/sum(Population)))%>%
+  mutate(New_Var = paste0(`Name`))
+
+nz <- left_join(nz, df101a, by = "Name", all=TRUE)
+
+
+nz$`First dose administered_adj` <- as.character(formatC(nz$`First dose administered`, 
+                                           big.mark = " ", 
+                                           format = "f", 
+                                           digits = 0))
+nz$`Second dose administered_adj` <- as.character(formatC(nz$`Second dose administered`, 
+                                           big.mark = " ", 
+                                           format = "f", 
+                                           digits = 0))
+
+nz<-nz %>%
+  mutate('First dose administered_adj' = case_when(
+    grepl("NA", as.character(`First dose administered_adj`)) ~ "",
+    TRUE ~ as.character(`First dose administered_adj`)
+   ))
+
+nz<-nz %>%
+  mutate('Second dose administered_adj' = case_when(
+    grepl("NA", as.character(`Second dose administered_adj`)) ~ "",
+    TRUE ~ as.character(`Second dose administered_adj`)
+   ))
+
+tmap_mode("plot")
+## tmap mode set to plotting
+tm1<-tm_shape(nz) +
+tm_fill() +
+tm_bubbles(size="First dose administered", col="yellow", size.lim=c(0, 2e7))+
+  tm_borders("white", lwd = .5) +
+  tm_layout(bg.color = "skyblue", inner.margins = c(0, .02, .02, .02))+
+  tm_text(text = "First dose administered_adj", size = 0.7, remove.overlap = TRUE )
+  
+
+tm2 <-tm_shape(nz) +
+tm_fill() +
+tm_bubbles(size="Second dose administered", col="green", size.lim=c(0, 2e7))+
+  tm_borders("white", lwd = .5) +
+  tm_layout(bg.color = "skyblue", inner.margins = c(0, .02, .02, .02))+
+  tm_text(text = "Second dose administered_adj", size = 0.7, remove.overlap = TRUE)
+
+tmap_arrange(tm1, tm2)
+
+```
+```{r plot101a}
+
+tmap_mode("plot")
+## tmap mode set to plotting
+tm2<-tm_shape(nz) +
+tm_fill() +
+tm_bubbles(size="First dose administered %", col="yellow", size.lim=c(0, 2e7))+
+  tm_borders("white", lwd = .5) +
+  tm_layout(bg.color = "skyblue", inner.margins = c(0, .02, .02, .02))+
+  tm_text(text = "First dose administered % ", size = 0.7, remove.overlap = TRUE )
+  
+
+tm3 <-tm_shape(nz) +
+tm_fill() +
+tm_bubbles(size="Second dose administered %", col="green", size.lim=c(0, 2e7))+
+  tm_borders("white", lwd = .5) +
+  tm_layout(bg.color = "skyblue", inner.margins = c(0, .02, .02, .02))+
+  tm_text(text = "Second dose administered % ", size = 0.7, remove.overlap = TRUE)
+
+tmap_arrange(tm2, tm3)
+
+```
+
+## Novelties
+
+In this section I will explore the dataset for ourtliers.
+
+### Outliers by DHB
+
+
+To keep the dataset clear I will remove the rows with the various or unknown data:
+- DHB of residence - 'Various', 'Overseas / Unknown';
+- Ethnic group - 'Unknown' and 'Various';
+- Age group - 'Various';
+- Gender - 'Unknown/Other', 'Various'; 
+
+
+```{r dataset_clean}
+Vaccin_DHB<-filter(Vaccin_DHB, 
+                    Vaccin_DHB$`DHB of residence`!="Various",
+                   Vaccin_DHB$`DHB of residence`!="Overseas / Unknown",
+                    Vaccin_DHB$`Ethnic group`!="Unknown",
+                    Vaccin_DHB$`Ethnic group`!="Various",
+                    Vaccin_DHB$`Age group`!="Various",
+                    Vaccin_DHB$Gender!="Unknown/Other",
+                    Vaccin_DHB$Gender!="Various")
+
+```
+
+Some DHBs have over 1000 vaccinated people per 1000 population because people from another DHBs can be vaccinated there. We decided to adjust all values over 1000 to 1000. 
+
+```{r dataset_adjust}
+
+
+Vaccin_DHB$`First dose uptake per 1000 people`[Vaccin_DHB$`First dose uptake per 1000 people` >1000] <- 1000
+Vaccin_DHB$`Second dose uptake per 1000 people`[Vaccin_DHB$`Second dose uptake per 1000 people` >1000] <- 1000
+
+```
+
+```{r outliers_DHB_firstDose}
+ggplot(data = Vaccin_DHB, aes(x=`DHB of residence`, y=`First dose uptake per 1000 people`)) + 
+geom_boxplot(aes(fill=`DHB of residence`), outlier.colour = "red")+ 
+#ggrepel::geom_label_repel() +
+labs(title = paste("Boxplots: First dose uptake per 1000 people"))+
+theme(axis.title.y = element_blank(), axis.text.y = element_text(face = "bold"), axis.ticks.y = element_blank(), axis.text.x = element_text(face = "bold",angle = 90))+
+theme(legend.position="down")
+```
+
+
+```{r outliers_DHB_secondDose}
+ggplot(data = Vaccin_DHB, aes(x=`DHB of residence`, y=`Second dose uptake per 1000 people`)) + 
+geom_boxplot(aes(fill=`DHB of residence`), outlier.colour = "red")+ 
+labs(title = paste("Boxplots: Second dose uptake per 1000 people"))+
+theme(axis.title.y = element_blank(), axis.text.y = element_text(face = "bold"), axis.ticks.y = element_blank(), axis.text.x = element_text(face = "bold",angle = 90))+
+theme(legend.position="down")
+
+```
+
+
+
+### Outliers by Age Group 
+
+ 
+```{r outliers_age_firstDose}
+library(ggrepel)
+ggplot(data = Vaccin_DHB, aes(x=`Age group`, y=`First dose uptake per 1000 people`)) + 
+geom_boxplot(aes(fill=`Age group`), outlier.colour = "red")+ 
+labs(title = paste("Boxplots: First dose uptake per 1000 people"))+
+theme(axis.title.y = element_blank(), axis.text.y = element_text(face = "bold"), axis.ticks.y = element_blank(), axis.text.x = element_text(face = "bold",angle = 90))+
+theme(legend.position="down")
+```
+
+
+```{r outliers_age_secondDose}
+library(ggrepel)
+ggplot(data = Vaccin_DHB, aes(x=`Age group`, y=`Second dose uptake per 1000 people`)) + 
+geom_boxplot(aes(fill=`Age group`), outlier.colour = "red")+ 
+labs(title = paste("Boxplots: Second dose uptake per 1000 people"))+
+theme(axis.title.y = element_blank(), axis.text.y = element_text(face = "bold"), axis.ticks.y = element_blank(), axis.text.x = element_text(face = "bold",angle = 90))+
+  theme(legend.position="down")
+```
+As per above there are no outliers detected in DHB by residence but we can see some outliers by Age group. Also the median line for the Age Group - second dose box plot has a big range (from ~100 to ~800).
+
+
+## DHB of Residence by ethnicity: Data overview
+
+To simplify visualisation I have decided to reduce the Age group cardinality from 18 to 8 via merging different Age Groups.
+
+
+```{r plot1}
+library(dplyr)
+Vaccin_DHB<-Vaccin_DHB %>%
+  mutate(Age_Group_min = case_when(
+    grepl("12-15", as.character(`Age group`)) ~ "12-19",
+    grepl("16-19", as.character(`Age group`)) ~ "12-19",
+    grepl("20-24", as.character(`Age group`)) ~ "20-29",
+    grepl("25-29", as.character(`Age group`)) ~ "20-29",
+    grepl("30-34", as.character(`Age group`)) ~ "30-39",
+    grepl("35-39", as.character(`Age group`)) ~ "30-39",
+    grepl("40-44", as.character(`Age group`)) ~ "40-49",
+    grepl("45-49", as.character(`Age group`)) ~ "40-49",
+    grepl("50-54", as.character(`Age group`)) ~ "50-59",
+    grepl("55-59", as.character(`Age group`)) ~ "50-59",
+    grepl("60-64", as.character(`Age group`)) ~ "60-69",
+    grepl("65-69", as.character(`Age group`)) ~ "60-69",
+    grepl("70-74", as.character(`Age group`)) ~ "70+",
+    grepl("75-79", as.character(`Age group`)) ~ "70+",
+    grepl("80-84", as.character(`Age group`)) ~ "70+",
+    grepl("85-89", as.character(`Age group`)) ~ "70+",
+    grepl("90+", as.character(`Age group`)) ~ "70+",
+    grepl("Various", as.character(`Age group`)) ~ "Various"
+    ))
+
+Vaccin_DHB$Age_Group_min<-factor(Vaccin_DHB$Age_Group_min)
+
+library(ggplot2)
+library(dplyr)
+
+df1 = Vaccin_DHB%>%
+  group_by(`DHB of residence`,`Age_Group_min`) %>%
+  summarise(Mean = mean(`First dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`DHB of residence`))
+
+
+ggplot(df1, aes(x = New_Var, y = Mean, fill = `Age_Group_min`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  ggtitle("First dose uptake per 1000 people by DHB for different Age Groups")+
+  xlab("DHB of residence") +
+  ylab("Vaccinated per 1000 people (mean by Age group)")+
+  scale_y_continuous(labels = scales::comma,limits=c(0,1000))
+
+
+```
+```{r plot2}
+
+df2 = Vaccin_DHB%>%
+  group_by(`DHB of residence`,`Age_Group_min`) %>%
+  summarise(Mean = mean(`Second dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`DHB of residence`))
+
+
+ggplot(df2, aes(x = New_Var, y = Mean, fill = `Age_Group_min`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  ggtitle("Second dose uptake per 1000 people by DHB for different Age Group")+
+  xlab("DHB of residence") +
+  ylab("Vaccinated per 1000 people (mean by Age group)")+
+  scale_y_continuous(labels = scales::comma,limits=c(0,1000))
+
+
+```
+
+```{r plot11}
+
+df11 = Vaccin_DHB%>%
+  group_by(`DHB of residence`,`Ethnic group`) %>%
+  summarise(Mean = mean(`First dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`DHB of residence`))
+
+
+ggplot(df11, aes(x = New_Var, y = Mean, fill = `Ethnic group`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  ggtitle("First dose uptake per 1000 people by DHB for different Ethnicity")+
+  xlab("DHB of residence") +
+  ylab("Vaccinated per 1000 people (mean by Ethnic group)")+
+  scale_y_continuous(labels = scales::comma,limits=c(0,1000))
+
+
+```
+
+
+
+```{r plot22}
+
+df22 = Vaccin_DHB%>%
+  group_by(`DHB of residence`,`Ethnic group`) %>%
+  summarise(Mean = mean(`Second dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`DHB of residence`))
+
+
+ggplot(df22, aes(x = New_Var, y = Mean, fill = `Ethnic group`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  ggtitle("Second dose uptake per 1000 people by DHB for different Ethnicity")+
+  xlab("DHB of residence") +
+  ylab("Vaccinated per 1000 people (mean by Ethnic group)")+
+  scale_y_continuous(labels = scales::comma,limits=c(0,1000))
+
+
+```
+
+
+```{r plot3}
+
+df3 = Vaccin_DHB%>%
+  group_by(`Ethnic group`,`Age_Group_min`) %>%
+  summarise(Mean = mean(`First dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`Ethnic group`))
+
+
+ggplot(df3, aes(x = New_Var, y = Mean, fill = `Age_Group_min`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  ggtitle("First dose uptake per 1000 people by Age group")+
+  xlab("Ethnic group") +
+  ylab("Vaccinated per 1000 people (mean by Age group)")+
+  scale_y_continuous(labels = scales::comma,limits=c(0,1000))
+
+```
+
+```{r plot33}
+
+df33 = Vaccin_DHB%>%
+  group_by(`Ethnic group`,`Age_Group_min`) %>%
+  summarise(Mean = mean(`Second dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`Ethnic group`))
+
+
+ggplot(df33, aes(x = New_Var, y = Mean, fill = `Age_Group_min`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  ggtitle("Second dose uptake per 1000 people by Age Group")+
+  xlab("Ethnic group") +
+  ylab("Vaccinated per 1000 people (mean by Age group)")+
+  scale_y_continuous(labels = scales::comma,limits=c(0,1000))
+
+```
+```{r plot6}
+
+df6 = Vaccin_DHB%>%
+  group_by(`DHB of residence`,`Gender`) %>%
+  summarise(Mean = mean(`First dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`DHB of residence`))
+
+
+ggplot(df6, aes(x = New_Var, y = Mean, fill = `Gender`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  ggtitle("First dose uptake per 1000 people by DHB for different Gender")+
+  xlab("DHB of residence") +
+  ylab("Vaccinated per 1000 people (mean by Gender)")+
+  scale_y_continuous(labels = scales::comma,limits=c(0,1000))
+
+```
+
+```{r plot66}
+
+df66 = Vaccin_DHB%>%
+  group_by(`DHB of residence`,`Gender`) %>%
+  summarise(Mean = mean(`Second dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`DHB of residence`))
+
+
+ggplot(df66, aes(x = New_Var, y = Mean, fill =`Gender`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  ggtitle("Second dose uptake per 1000 people by DHB for different Gender")+
+  xlab("DHB of residence") +
+  ylab("Vaccinated per 1000 people (mean by Gender)")+
+  scale_y_continuous(labels = scales::comma,limits=c(0,1000))
+
+```
+```{r plot7}
+
+df7 = Vaccin_DHB%>%
+  group_by(`Ethnic group`,`Gender`) %>%
+  summarise(Mean = mean(`First dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`Ethnic group`))
+
+
+ggplot(df7, aes(x = New_Var, y = Mean, fill = `Gender`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  ggtitle("First dose uptake per 1000 people by Ethnicity for different Gender")+
+  xlab("Ethnic group") +
+  ylab("Vaccinated per 1000 people (mean by Gender)")+
+  scale_y_continuous(labels = scales::comma,limits=c(0,1000))
+
+```
+
+```{r plot77}
+
+df77 = Vaccin_DHB%>%
+  group_by(`Ethnic group`,`Gender`) %>%
+  summarise(Mean = mean(`Second dose uptake per 1000 people`), Sd = sd(`Second dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`Ethnic group`))
+
+
+ggplot(df77, aes(x = New_Var, y = Mean, fill =`Gender`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  ggtitle("Second dose uptake per 1000 people by Ethnicity for different Gender")+
+  xlab("Ethnic group") +
+  ylab("Vaccinated per 1000 people (mean by Gender)")+
+  scale_y_continuous(labels = scales::comma,limits=c(0,1000))
+
+```
+
+```{r plot8}
+
+df8 = Vaccin_DHB%>%
+  group_by(`Age group`,`Gender`) %>%
+  summarise(Mean = mean(`First dose uptake per 1000 people`), Sd = sd(`First dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`Age group`))
+
+
+ggplot(df8, aes(x = New_Var, y = Mean, fill = `Gender`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  ggtitle("First dose uptake per 1000 people by Age Group for different Gender")+
+  xlab("Age group") +
+  ylab("Vaccinated per 1000 people (mean by Gender)")+
+  scale_y_continuous(labels = scales::comma,limits=c(0,1000))
+
+```
+
+```{r plot88}
+
+df88 = Vaccin_DHB%>%
+  group_by(`Age group`,`Gender`) %>%
+  summarise(Mean = mean(`Second dose uptake per 1000 people`), Sd = sd(`Second dose uptake per 1000 people`)) %>%
+  mutate(New_Var = paste0(`Age group`))
+
+
+ggplot(df88, aes(x = New_Var, y = Mean, fill =`Gender`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  
+  ggtitle("Second dose uptake per 1000 people by Age Group for different Gender")+
+  xlab("Age group") +
+  ylab("Vaccinated per 1000 people (mean by Age group)")+
+  scale_y_continuous(labels = scales::comma,limits=c(0,1000))
+
+```
+
+```{r plot4}
+library(scales)
+df4sum<-sum(Vaccin_DHB$`First dose administered`)
+df4 = Vaccin_DHB%>%
+  group_by(`Ethnic group`) %>%
+  summarise(Sum = sum(`First dose administered`), Labels=percent(sum(`First dose administered`)/ df4sum ), pop=sum(`Population`) )%>%
+  mutate(New_Var = paste0(`Ethnic group`))
+
+#remove values less than 1% as they are not significant
+df4<-df4[which(df4$Labels>1),]
+
+```
+
+```{r plot44}
+
+df44sum<-sum(Vaccin_DHB$`Second dose administered`)
+df44 = Vaccin_DHB%>%
+  group_by(`Ethnic group`) %>%
+  summarise(Sum = sum(`Second dose administered`), Labels=percent(sum(`Second dose administered`)/ df44sum ), pop=sum(`Population`) )%>%
+  mutate(New_Var = paste0(`Ethnic group`))
+
+#remove values less than 1% as they are not significant
+df44<-df44[which(df44$Labels>1),]
+
+```
+
+
+```{r plot4a}
+library(scales)
+df4a = Vaccin_DHB%>%
+  group_by(`Ethnic group`) %>%
+  summarise(Sum = sum(`First dose administered`), pop=sum(`Population`) )%>%
+  mutate(New_Var = paste0(`Ethnic group`))
+
+```
+
+
+```{r plot44a}
+df44a = Vaccin_DHB%>%
+  group_by(`Ethnic group`) %>%
+  summarise(Sum = sum(`Second dose administered`), pop=sum(`Population`) )%>%
+  mutate(New_Var = paste0(`Ethnic group`))
+```
+
+```{r plot44b}
+
+df4a$name <-"First dose administered"
+df44a$name <-"Second dose administered"
+d<-rbind(df4a, df44a)
+
+ggplot(d, aes(x = New_Var, y =Sum/pop, fill =`name`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  scale_y_continuous(labels=scales::percent, limits=c(0,1)) +
+  ggtitle("Vaccin admin in % of a total pupolation by Ethnicity for all DHBs")+
+  xlab("Ethnic Group") +
+  ylab("Dose administered, %")
+  
+```
+```{r plot5}
+
+df5sum<-sum(Vaccin_DHB$`First dose administered`)
+df5 = Vaccin_DHB%>%
+  group_by(`Age_Group_min`) %>%
+  summarise(Sum = sum(`First dose administered`), Labels=percent(sum(`First dose administered`)/ df5sum ) , pop=sum(`Population`))%>%
+  mutate(New_Var = paste0(`Age_Group_min`))
+
+#remove values less than 1% as they are not significant
+df5<-df5[which(df5$Labels>1),]
+
+```
+
+```{r plot55}
+df55sum<-sum(Vaccin_DHB$`Second dose administered`)
+df55 = Vaccin_DHB%>%
+  group_by(`Age_Group_min`) %>%
+  summarise(Sum = sum(`Second dose administered`), Labels=percent(sum(`Second dose administered`)/ df55sum ), pop=sum(`Population`) )%>%
+  mutate(New_Var = paste0(`Age_Group_min`))
+
+#remove values less than 1% as they are not significant
+df55<-df55[which(df55$Labels>1),]
+
+```
+```{r plot5b}
+df5$name <-"First dose administered"
+df55$name <-"Second dose administered"
+d<-rbind(df5, df55)
+
+ggplot(d, aes(x = New_Var, y =Sum/pop, fill =`name`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold"),
+  legend.title = element_blank()) +
+  scale_y_continuous(labels=scales::percent, limits=c(0,1)) +
+  ggtitle("Vaccin admin in % of a total pupolation by Age group for all DHBs")+
+  xlab("Age Group") +
+  ylab("Dose administered, %")+
+  coord_flip()
+
+```
+
+```{r plot9}
+
+df9sum<-sum(Vaccin_DHB$`First dose administered`)
+df9 = Vaccin_DHB%>%
+  group_by(`Gender`) %>%
+  summarise(Sum = sum(`First dose administered`), Labels=percent(sum(`First dose administered`)/ df9sum ), pop=sum(`Population`) )%>%
+  mutate(New_Var = paste0(`Gender`))
+
+#remove values less than 1% as they are not significant
+df9<-df9[which(df9$Labels>1),]
+
+```
+
+```{r plot99}
+df99sum<-sum(Vaccin_DHB$`Second dose administered`)
+df99 = Vaccin_DHB%>%
+  group_by(`Gender`) %>%
+  summarise(Sum = sum(`Second dose administered`), Labels=percent(sum(`Second dose administered`)/ df99sum ), pop=sum(`Population`) )%>%
+  mutate(New_Var = paste0(`Gender`))
+
+#remove values less than 1% as they are not significant
+df99<-df99[which(df99$Labels>1),]
+
+```
+```{r plot9b}
+df9$name <-"First dose administered"
+df99$name <-"Second dose administered"
+d<-rbind(df9, df99)
+
+ggplot(d, aes(x = New_Var, y =Sum/pop, fill =`name`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold"),
+  legend.title = element_blank()) +
+  scale_y_continuous(labels=scales::percent, limits=c(0,1)) +
+  ggtitle("Vaccin admin in % of a total pupolation by Age group for all DHBs")+
+  xlab("Gender") +
+  ylab("Dose administered, %")+
+  coord_flip()
+
+```
+```{r plot100}
+library(scales)
+df100 = Vaccin_DHB%>%
+  group_by(`DHB of residence`) %>%
+  summarise(Sum = sum(`First dose administered`), pop=sum(`Population`) )%>%
+  mutate(New_Var = paste0(`DHB of residence`))
+```
+
+```{r plot100a}
+
+library(scales)
+df100a = Vaccin_DHB%>%
+  group_by(`DHB of residence`) %>%
+  summarise(Sum = sum(`Second dose administered`), pop=sum(`Population`) )%>%
+  mutate(New_Var = paste0(`DHB of residence`))
+```
+
+```{r plot100b}
+
+df100$name <-"First dose administered"
+df100a$name <-"Second dose administered"
+d100<-rbind(df100, df100a)
+
+ggplot(d100, aes(x = New_Var, y =Sum/pop, fill =`name`)) +
+  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
+  theme(axis.text.x = element_text(face = "bold",angle = 90),
+  legend.title = element_blank()) +
+  scale_y_continuous(labels=scales::percent, limits=c(0,1)) +
+  ggtitle("Vaccin admin in % of a total population by DHB")+
+  xlab("DHB of residence") +
+  ylab("Dose administered, %")
+  
+```
+
+## COVID-19 vaccination project for NZ.
+
+### Loading vaccinations data from STATS NZ using API
 
 To load the data we have used API published by the Stats NZ.
+
 Dataframe Observations_CPCOV10 contains the cumulative vaccination data around NZ.
+
 Dataframe Observations_CPCOV11 contains the cumulative vaccination data by vaccinator. 
+
+**Cumulative total**: All vaccinations that have been administered and entered into the COVID-19 Immunisation Register up until midnight of the night before the data is published.
+
 ```{r setup}
 source("get-opendata-catalogue-fun.R")
 
@@ -64,14 +808,14 @@ Observations_CPCOV11$Label1<-factor(Observations_CPCOV11$Label1)
 ```
 Observations_CPCOV10 dataframe includs 84 observations and 9 variables. After the data is loaded there are three data types detected: character, numeric and integer. I have updated the Period to date variable and Label to factor and its cardinality is 3.
 
-Observations_CPCOV11 dataframe contains 56 observations and 11 variables. After the data is loaded there are three data types detected: character, numeric and integer. I have updated the Period to date variable and Label to factor and its cardinality is 2.
+Observations_CPCOV11 dataframe contains 58 observations and 11 variables. After the data is loaded there are three data types detected: character, numeric and integer. I have updated the Period to date variable and Label to factor and its cardinality is 2.
 
 
 ## Cumulative vaccination dataset analisys
 
 ### Cumulative vaccination: Data overview
 
-Plot the dataset using *ggplot* function
+Plot the dataset using 'ggplot' function
 
 ```{r plot}
 library(ggplot2)
@@ -90,13 +834,13 @@ ggplot(Observations_CPCOV10, aes(x=Period, y = Value, group=Label1, colour=Label
 
 There are some inconsistency in Cumulative vaccine stock data between June and August.
 
-Data table
+### Data table
 
 
 ```{r cumulative_data_table}
 Observations_CPCOV10
 ```
-Summary table
+### Summary table
 
 ```{r summary}
 summary(Observations_CPCOV10)
@@ -114,6 +858,10 @@ vis_dat(Observations_CPCOV10) + ggtitle("Missing Value Distribution")
 As per above there is no missing data detected in the dataset.
 
 ### Cumulative vaccination: Novelties
+
+Box plot allows to identify outliers for a numeric data. Our data is cumulative and the latest observations are treated as outliers. This is why we can see some outliers on the box plot.
+
+
 ```{r outliers1}
 
 ggplot(data = Observations_CPCOV10, aes(x="Label", y=Value)) + geom_boxplot(aes(fill=Label1), outlier.colour = "red")+ 
@@ -122,13 +870,13 @@ labs(title = paste("Boxplots: Cumulative vaccinations"))+
   scale_y_continuous(labels = scales::comma)
 ```
 
-Box plot allows to identify outliers for a numeric data. There are some outliers detected but because this is a cumulative data the latest observations are treated as outliers.
+
 
 ### Cumulative vaccination: Split data by testing and trainign dataset
 
 To valuate the method performance we should split the dataset by testing and training. 
-The first 80% of data is assigned to a training dataset and the last 20% is assigned to a testing dataset.
-We will traing our method using training dataset and find the optimal hyper parameters for our model. The model with the optimal hyperparameters will be applied to the training dataset. 
+The first 80% of data is assigned to a training and the last 20% is assigned to a testing dataset.
+We will train our methods using training dataset and find the optimal hyper parameters for our model. The model with the optimal hyperparameters will be applied to the training dataset. 
 
 ```{r sampling}
 #separate "Cumulative vaccinations administered" observations as we are going to do a projection just for "Cumulative vaccinations administered"
@@ -181,7 +929,7 @@ err_Value<-c(round(RMSE_svm,2), round(RSE_svm,2), round(MAE_svm,2))
 employ.data <- data.frame(Measurement, err_Value)
 employ.data
 ```
-Above table is showing the SVM performs too good and there is a high risk of overfitting. 
+Above table is showing the SVM is showing a bad performance. 
 We can plot the predicted and testing values to see how our model behaves.
 
 ```{r plot_test_svm}
@@ -202,7 +950,6 @@ ggplot()+
   scale_x_date(date_labels = "%b %d", date_breaks = "1 week")
 ```
 
-As per above plot the predicted values are higher then actual at the end which means the projection could potentially overestimate the number of vaccinations.
 
 We should also check the residual outliers for our model. Residual=forecast-test or train
 
@@ -243,9 +990,9 @@ d_svm_test <- data.frame(test$Value, predictYsvm)
     
 ```
 
-There are no residuals outliers detected in a testing dataset.
+There is one residuals outliers detected in a testing dataset.
 
-### Cumulative vaccination: Vaccination forecast - SVM
+### Cumulative vaccination: Vaccination projection - SVM
 Vaccination projection using SVM.
 We have to create a model using the whole dataset.
 
@@ -309,7 +1056,7 @@ ggplot()+
   geom_hline(yintercept=9220680, linetype="dashed", color = "red")+
   annotate("text",x = as.Date("2021-04-07"), y = 9220680, label = "90% population", color = "red")+
   scale_y_continuous(limits=c(0,11000000), labels = scales::comma)+
-  ggtitle("Cumulative vaccinations forecast - SVM")+
+  ggtitle("Cumulative vaccinations projection - SVM")+
   xlab("Week ending") +
   ylab("Number of vaccinations administered")+
   labs(fill = "1")+
@@ -354,7 +1101,7 @@ err_Value<-c(round(RMSE_lm,2), round(RSE_lm,2), round(MAE_lm,2))
 employ.data <- data.frame(Measurement, err_Value)
 employ.data
 ```
-Polynomial Regression model is showing a good result on a testing dataset. Also we can control the function degree adding or removing variables. The optimal number is 2 as it gives us R-squared around 0.62, so our model is not overfitting.
+Polynomial Regression model is showing a good result on a testing dataset. Also we can control the function degree adding or removing variables. The optimal number is 2 as it gives us R-squared around 0.83, so our model is not overfitting.
 We can plot the predicted and testing values to see how our model behaves. 
 
 ```{r plot_prediction_lm}
@@ -394,7 +1141,7 @@ Checking the residuals outliers for training dataset:
   
 ```
 
-There are no residual outliers are detected in training dataset. 
+There are tow residual outliers are detected in training dataset. 
 
 Checking the residuals outliers for testing dataset:
 ```{r plot_test_lm3}
@@ -510,704 +1257,3 @@ ggplot(data = Observations_CPCOV11, aes(x="Label1", y=Value)) + geom_boxplot(aes
 
 There are no outliers detected. 
 
-## DHB of Residence by ethnicity: Loading vaccinations data from the Excel file published by the Ministry of Health
-To check how NZ performs with vaccination we have downloaded the dataset published by the Ministry of Health. The dataset is dated from 7 September 2021.
-
-Vaccin_DHB dataframe contains 28 observations and 9 variables. After the data is loaded there are three data types detected: character, numeric and integer. I have updated the `DHB of residence`, `Age group`, `Ethnic group`, `Gender` to a factor as these variables have a low cardinality.
-
-```{r read_excel1}
-
-library("readxl")
-Vaccin_DHB <- read_excel("covid_vaccinations.xlsx", sheet = "DHBofResidence by ethnicity")
-#drop last two columns
-Vaccin_DHB<-Vaccin_DHB[-c(10,11)]
-Vaccin_DHB$`DHB of residence`<-factor(Vaccin_DHB$`DHB of residence`)
-Vaccin_DHB$`Age group`<-factor(Vaccin_DHB$`Age group`)
-Vaccin_DHB$`Ethnic group`<-factor(Vaccin_DHB$`Ethnic group`)
-Vaccin_DHB$`Gender`<-factor(Vaccin_DHB$`Gender`)
-Vaccin_DHB
-```
-Datafreame summary
-```{r summarytools}
-library(summarytools)
-summarytools::view(summarytools::dfSummary(Vaccin_DHB), method = "render")
-```
-
-### DHB of Residence by ethnicity: Homogeniety
-
-I have selected numeric variables to check the homogeniety. As per below the data belongs together and there is no significant differences in the numeric data.
-
-
-```{r homogeniety}
-cols <- c("First dose administered","Second dose administered","Population","First dose uptake per 1000 people","Second dose uptake per 1000 people") # choose the numeric columns
-numData <- scale(Vaccin_DHB[,cols], center = TRUE, scale = TRUE) 
-matplot(numData, type = "l", col = rainbow(ncol(numData)), xlab = "Observations in sequence", ylab = "Value") 
-```
-
-
-### DHB of Residence by ethnicity: : Explore dataset for a missing data
-
-Plot the missing observations.
-
-```{r missing_}
-library(visdat)
-library(ggplot2)
-vis_dat(Vaccin_DHB) + ggtitle("Missing Value Distribution")
-```
-
-There is no missing data in the dataset.
-
-## Novelties
-
-Outliers by DHB - First Dose
-
-
-To keep the dataset clear I will remove the rows with the various or unknown data:
-- DHB of residence - 'Various', 'Overseas / Unknown';
-- Ethnic group - 'Unknown' and 'Various';
-- Age group - 'Various';
-- Gender - 'Unknown/Other', 'Various'; 
-
-```{r dataset_clean}
-Vaccin_DHB<-filter(Vaccin_DHB, 
-                    Vaccin_DHB$`DHB of residence`!="Various",
-                   Vaccin_DHB$`DHB of residence`!="Overseas / Unknown",
-                    Vaccin_DHB$`Ethnic group`!="Unknown",
-                    Vaccin_DHB$`Ethnic group`!="Various",
-                    Vaccin_DHB$`Age group`!="Various",
-                    Vaccin_DHB$Gender!="Unknown/Other",
-                    Vaccin_DHB$Gender!="Various")
-
-```
-Some DHBs have over 1000 vaccinated people per 1000 population because people from another DHBs can be vaccinated there. We decided to adjust all values over 1000 to 1000. 
-
-```{r dataset_adjust}
-
-
-Vaccin_DHB$`First dose uptake per 1000 people`[Vaccin_DHB$`First dose uptake per 1000 people` >1000] <- 1000
-Vaccin_DHB$`Second dose uptake per 1000 people`[Vaccin_DHB$`Second dose uptake per 1000 people` >1000] <- 1000
-
-```
-
-```{r outliers_DHB_firstDose}
-ggplot(data = Vaccin_DHB, aes(x=`DHB of residence`, y=`First dose uptake per 1000 people`)) + 
-geom_boxplot(aes(fill=`DHB of residence`), outlier.colour = "red")+ 
-#ggrepel::geom_label_repel() +
-labs(title = paste("Boxplots: First dose uptake per 1000 people"))+
-theme(axis.title.y = element_blank(), axis.text.y = element_text(face = "bold"), axis.ticks.y = element_blank(), axis.text.x = element_text(face = "bold",angle = 90))+
-theme(legend.position="down")
-```
-
-Outliers by DHB - Second Dose
-
-```{r outliers_DHB_secondDose}
-ggplot(data = Vaccin_DHB, aes(x=`DHB of residence`, y=`Second dose uptake per 1000 people`)) + 
-geom_boxplot(aes(fill=`DHB of residence`), outlier.colour = "red")+ 
-labs(title = paste("Boxplots: Second dose uptake per 1000 people"))+
-theme(axis.title.y = element_blank(), axis.text.y = element_text(face = "bold"), axis.ticks.y = element_blank(), axis.text.x = element_text(face = "bold",angle = 90))+
-theme(legend.position="down")
-```
-
-
-
-Outliers by Age Group - First Dose
-
-Low outliers are showing for the age group 55-90+. 
-```{r outliers_age_firstDose}
-library(ggrepel)
-ggplot(data = Vaccin_DHB, aes(x=`Age group`, y=`First dose uptake per 1000 people`)) + 
-geom_boxplot(aes(fill=`Age group`), outlier.colour = "red")+ 
-labs(title = paste("Boxplots: First dose uptake per 1000 people"))+
-theme(axis.title.y = element_blank(), axis.text.y = element_text(face = "bold"), axis.ticks.y = element_blank(), axis.text.x = element_text(face = "bold",angle = 90))+
-theme(legend.position="down")
-```
-
-Outliers by Age Group - Second Dose
-
- 
-```{r outliers_age_secondDose}
-library(ggrepel)
-ggplot(data = Vaccin_DHB, aes(x=`Age group`, y=`Second dose uptake per 1000 people`)) + 
-geom_boxplot(aes(fill=`Age group`), outlier.colour = "red")+ 
-labs(title = paste("Boxplots: Second dose uptake per 1000 people"))+
-theme(axis.title.y = element_blank(), axis.text.y = element_text(face = "bold"), axis.ticks.y = element_blank(), axis.text.x = element_text(face = "bold",angle = 90))+
-  theme(legend.position="down")
-```
-### Total Vaccinations
-Data in this section is as at 11:59pm 16 September 2021 and is updated each week day (Monday to Friday).
-
-```{r plot102}
-
-
-library(scales)
-#df102 = Vaccin_DHB%>%
-#  summarise(Sum_first = sum(`First dose administered`), Sum_second = sum(`Second dose administered`), pop=sum(`Population`) )
-
-Population=sum(Vaccin_DHB$`Population`) 
-Sum_first<-(percent(sum(Vaccin_DHB$`First dose administered`)/Population))
-Sum_second<-(percent(sum(Vaccin_DHB$`Second dose administered`)/Population))
-Label2<-c("First dose administered", "Second dose administered")
-Vaccin<-c(Sum_first, Sum_second)
-Vaccin_admin <- data.frame(Label2, Vaccin)
-
-
-
-ggplot(Vaccin_admin, aes(x = "", y =Vaccin, fill =`Label2`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold"),
-  legend.title = element_blank()) +
-  #scale_y_continuous(labels=scales::percent) +
-  ggtitle("% of doses administered around NZ")+
-  coord_flip()+
-  xlab("First/Second dose") +
-  ylab("% of doses administered")
-```
-
-Definitions:
-Cumulative total: All vaccinations that have been administered and entered into the COVID-19 Immunisation Register up until midnight of the night before the data is published.
-Eligible population vaccinated %: Vaccinations administered divided by HSU population estimates for the eligible population (12+).
-Total population vaccinated %: Vaccinations administered divided by HSU population estimates for the total population (0+).
-Vaccinated or booked: Count of individuals who have either received their vaccination or have booked via Book My Vaccine to receive a vaccination.
-Eligible vaccinated or booked %: Count of individuals who have either received their vaccination or have booked via Book My Vaccine to receive a vaccination divided by HSU population estimates for the eligible population (12+).
-
-### DHB of Residence by ethnicity: Data overview
-
-To simplify visualisation I have decided to reduce the Age group from 18 to 8 merging different Age Groups.
-
-```{r plot1}
-library(dplyr)
-Vaccin_DHB<-Vaccin_DHB %>%
-  mutate(Age_Group_min = case_when(
-    grepl("12-15", as.character(`Age group`)) ~ "12-19",
-    grepl("16-19", as.character(`Age group`)) ~ "12-19",
-    grepl("20-24", as.character(`Age group`)) ~ "20-29",
-    grepl("25-29", as.character(`Age group`)) ~ "20-29",
-    grepl("30-34", as.character(`Age group`)) ~ "30-39",
-    grepl("35-39", as.character(`Age group`)) ~ "30-39",
-    grepl("40-44", as.character(`Age group`)) ~ "40-49",
-    grepl("45-49", as.character(`Age group`)) ~ "40-49",
-    grepl("50-54", as.character(`Age group`)) ~ "50-59",
-    grepl("55-59", as.character(`Age group`)) ~ "50-59",
-    grepl("60-64", as.character(`Age group`)) ~ "60-69",
-    grepl("65-69", as.character(`Age group`)) ~ "60-69",
-    grepl("70-74", as.character(`Age group`)) ~ "70+",
-    grepl("75-79", as.character(`Age group`)) ~ "70+",
-    grepl("80-84", as.character(`Age group`)) ~ "70+",
-    grepl("85-89", as.character(`Age group`)) ~ "70+",
-    grepl("90+", as.character(`Age group`)) ~ "70+",
-    grepl("Various", as.character(`Age group`)) ~ "Various"
-    ))
-
-Vaccin_DHB$Age_Group_min<-factor(Vaccin_DHB$Age_Group_min)
-
-library(ggplot2)
-library(dplyr)
-
-df1 = Vaccin_DHB%>%
-  group_by(`DHB of residence`,`Age_Group_min`) %>%
-  summarise(Mean = mean(`First dose uptake per 1000 people`), Sd = sd(`First dose uptake per 1000 people`)) %>%
-  mutate(New_Var = paste0(`DHB of residence`))
-
-
-ggplot(df1, aes(x = New_Var, y = Mean, fill = `Age_Group_min`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  ggtitle("First dose uptake per 1000 people by DHB for different Age Groups")+
-  xlab("DHB of residence") +
-  ylab("Number of vaccines admin (mean by Age group)")
-
-
-```
-
-```{r plot11}
-
-df11 = Vaccin_DHB%>%
-  group_by(`DHB of residence`,`Ethnic group`) %>%
-  summarise(Mean = mean(`First dose uptake per 1000 people`), Sd = sd(`First dose uptake per 1000 people`)) %>%
-  mutate(New_Var = paste0(`DHB of residence`))
-
-
-ggplot(df11, aes(x = New_Var, y = Mean, fill = `Ethnic group`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  ggtitle("First dose uptake per 1000 people by DHB for different Ethnicity")+
-  xlab("DHB of residence") +
-  ylab("Number of vaccines admin (mean by Ethnic group)")
-
-
-```
-
-```{r plot2}
-
-df2 = Vaccin_DHB%>%
-  group_by(`DHB of residence`,`Age_Group_min`) %>%
-  summarise(Mean = mean(`Second dose uptake per 1000 people`), Sd = sd(`Second dose uptake per 1000 people`)) %>%
-  mutate(New_Var = paste0(`DHB of residence`))
-
-
-ggplot(df2, aes(x = New_Var, y = Mean, fill = `Age_Group_min`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  ggtitle("Second dose uptake per 1000 people by DHB for different Age Group")+
-  xlab("DHB of residence") +
-  ylab("Number of vaccines admin (mean by Age group)")
-
-
-```
-
-```{r plot22}
-
-df22 = Vaccin_DHB%>%
-  group_by(`DHB of residence`,`Ethnic group`) %>%
-  summarise(Mean = mean(`Second dose uptake per 1000 people`), Sd = sd(`Second dose uptake per 1000 people`)) %>%
-  mutate(New_Var = paste0(`DHB of residence`))
-
-
-ggplot(df22, aes(x = New_Var, y = Mean, fill = `Ethnic group`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  ggtitle("Second dose uptake per 1000 people by DHB for different Ethnicity")+
-  xlab("DHB of residence") +
-  ylab("Number of vaccines admin (mean by Ethnic group)")
-
-
-```
-
-
-```{r plot3}
-
-df3 = Vaccin_DHB%>%
-  group_by(`Ethnic group`,`Age_Group_min`) %>%
-  summarise(Mean = mean(`First dose uptake per 1000 people`), Sd = sd(`First dose uptake per 1000 people`)) %>%
-  mutate(New_Var = paste0(`Ethnic group`))
-
-
-ggplot(df3, aes(x = New_Var, y = Mean, fill = `Age_Group_min`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  ggtitle("First dose uptake per 1000 people by Age group")+
-  xlab("Ethnic group") +
-  ylab("Number of vaccines admin (mean by Age group)")
-
-```
-
-```{r plot33}
-
-df33 = Vaccin_DHB%>%
-  group_by(`Ethnic group`,`Age_Group_min`) %>%
-  summarise(Mean = mean(`Second dose uptake per 1000 people`), Sd = sd(`Second dose uptake per 1000 people`)) %>%
-  mutate(New_Var = paste0(`Ethnic group`))
-
-
-ggplot(df33, aes(x = New_Var, y = Mean, fill = `Age_Group_min`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  ggtitle("Second dose uptake per 1000 people by Age Group")+
-  xlab("Ethnic group") +
-  ylab("Number of vaccines admin (mean by Age group)")
-
-```
-```{r plot6}
-
-df6 = Vaccin_DHB%>%
-  group_by(`DHB of residence`,`Gender`) %>%
-  summarise(Mean = mean(`First dose uptake per 1000 people`), Sd = sd(`First dose uptake per 1000 people`)) %>%
-  mutate(New_Var = paste0(`DHB of residence`))
-
-
-ggplot(df6, aes(x = New_Var, y = Mean, fill = `Gender`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  ggtitle("First dose uptake per 1000 people by DHB for different Gender")+
-  xlab("DHB of residence") +
-  ylab("Number of vaccines admin (mean by Gender)")
-
-```
-
-```{r plot66}
-
-df66 = Vaccin_DHB%>%
-  group_by(`DHB of residence`,`Gender`) %>%
-  summarise(Mean = mean(`Second dose uptake per 1000 people`), Sd = sd(`Second dose uptake per 1000 people`)) %>%
-  mutate(New_Var = paste0(`DHB of residence`))
-
-
-ggplot(df66, aes(x = New_Var, y = Mean, fill =`Gender`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  ggtitle("Second dose uptake per 1000 people by DHB for different Gender")+
-  xlab("DHB of residence") +
-  ylab("Number of vaccines admin (mean by Gender)")
-
-```
-```{r plot7}
-
-df7 = Vaccin_DHB%>%
-  group_by(`Ethnic group`,`Gender`) %>%
-  summarise(Mean = mean(`First dose uptake per 1000 people`), Sd = sd(`First dose uptake per 1000 people`)) %>%
-  mutate(New_Var = paste0(`Ethnic group`))
-
-
-ggplot(df7, aes(x = New_Var, y = Mean, fill = `Gender`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  ggtitle("First dose uptake per 1000 people by Ethnicity for different Gender")+
-  xlab("Ethnic group") +
-  ylab("Number of vaccines admin (mean by Gender)")
-
-```
-
-```{r plot77}
-
-df77 = Vaccin_DHB%>%
-  group_by(`Ethnic group`,`Gender`) %>%
-  summarise(Mean = mean(`Second dose uptake per 1000 people`), Sd = sd(`Second dose uptake per 1000 people`)) %>%
-  mutate(New_Var = paste0(`Ethnic group`))
-
-
-ggplot(df77, aes(x = New_Var, y = Mean, fill =`Gender`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  ggtitle("Second dose uptake per 1000 people by Ethnicity for different Gender")+
-  xlab("Ethnic group") +
-  ylab("Number of vaccines admin (mean by Gender)")
-
-```
-
-```{r plot8}
-
-df8 = Vaccin_DHB%>%
-  group_by(`Age group`,`Gender`) %>%
-  summarise(Mean = mean(`First dose uptake per 1000 people`), Sd = sd(`First dose uptake per 1000 people`)) %>%
-  mutate(New_Var = paste0(`Age group`))
-
-
-ggplot(df8, aes(x = New_Var, y = Mean, fill = `Gender`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  ggtitle("First dose uptake per 1000 people by Age Group for different Gender")+
-  xlab("Age group") +
-  ylab("Number of vaccines admin (mean by Gender)")
-
-```
-
-```{r plot88}
-
-df88 = Vaccin_DHB%>%
-  group_by(`Age group`,`Gender`) %>%
-  summarise(Mean = mean(`Second dose uptake per 1000 people`), Sd = sd(`Second dose uptake per 1000 people`)) %>%
-  mutate(New_Var = paste0(`Age group`))
-
-
-ggplot(df88, aes(x = New_Var, y = Mean, fill =`Gender`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  ggtitle("Second dose uptake per 1000 people by Age Group for different Gender")+
-  xlab("Age group") +
-  ylab("Number of vaccines admin (mean by Age group)")
-
-```
-
-```{r plot4}
-library(scales)
-df4sum<-sum(Vaccin_DHB$`First dose administered`)
-df4 = Vaccin_DHB%>%
-  group_by(`Ethnic group`) %>%
-  summarise(Sum = sum(`First dose administered`), Labels=percent(sum(`First dose administered`)/ df4sum ) )%>%
-  mutate(New_Var = paste0(`Ethnic group`))
-
-#remove values less than 1% as they are not significant
-df4<-df4[which(df4$Labels>1),]
-
-#plot a pie
-pie(df4$Sum, labels = paste(df4$`Ethnic group`,df4$Labels), main="First Dose administered by Ethnicity for all DHB", col=terrain.colors(length(df4$Labels)))
-
-```
-
-```{r plot44}
-
-df44sum<-sum(Vaccin_DHB$`Second dose administered`)
-df44 = Vaccin_DHB%>%
-  group_by(`Ethnic group`) %>%
-  summarise(Sum = sum(`Second dose administered`), Labels=percent(sum(`Second dose administered`)/ df44sum ) )%>%
-  mutate(New_Var = paste0(`Ethnic group`))
-
-#remove values less than 1% as they are not significant
-df44<-df44[which(df44$Labels>1),]
-
-#plot a pie
-pie(df44$Sum, labels = paste(df44$`Ethnic group`,df44$Labels), main="Second Dose administered by Ethnicity for all DHB", col=terrain.colors(length(df44$Labels)))
-  
-```
-
-```{r plot4a}
-library(scales)
-df4a = Vaccin_DHB%>%
-  group_by(`Ethnic group`) %>%
-  summarise(Sum = sum(`First dose administered`), pop=sum(`Population`) )%>%
-  mutate(New_Var = paste0(`Ethnic group`))
-
-ggplot(df4a, aes(x = New_Var, y =Sum/pop, fill =`Ethnic group`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  scale_y_continuous(labels=scales::percent) +
-  ggtitle("First dose dose vaccin admin in % of a total pupolation by Ethnicity for all DHB")+
-  xlab("Ethnic Group") +
-  ylab("First dose administered, %")
-
-```
-
-```{r plot44a}
-
-library(scales)
-df44a = Vaccin_DHB%>%
-  group_by(`Ethnic group`) %>%
-  summarise(Sum = sum(`Second dose administered`), pop=sum(`Population`) )%>%
-  mutate(New_Var = paste0(`Ethnic group`))
-
-ggplot(df44a, aes(x = New_Var, y =Sum/pop, fill =`Ethnic group`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  scale_y_continuous(labels=scales::percent) +
-  ggtitle("Second dose vaccin admin in % of a total pupolation by Ethnicity for all DHB")+
-  xlab("Ethnic Group") +
-  ylab("Second dose administered, %")
-  
-```
-
-```{r plot44b}
-
-df4a$name <-"First dose administered"
-df44a$name <-"Second dose administered"
-d<-rbind(df4a, df44a)
-
-ggplot(d, aes(x = New_Var, y =Sum/pop, fill =`name`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  scale_y_continuous(labels=scales::percent) +
-  ggtitle("Vaccin admin in % of a total pupolation by Ethnicity for all DHB")+
-  xlab("Ethnic Group") +
-  ylab("Dose administered, %")
-  
-```
-```{r plot5}
-
-df5sum<-sum(Vaccin_DHB$`First dose administered`)
-df5 = Vaccin_DHB%>%
-  group_by(`Age_Group_min`) %>%
-  summarise(Sum = sum(`First dose administered`), Labels=percent(sum(`First dose administered`)/ df5sum ) )%>%
-  mutate(New_Var = paste0(`Age_Group_min`))
-
-#remove values less than 1% as they are not significant
-df5<-df5[which(df5$Labels>1),]
-
-#plot a pie
-pie(df5$Sum, labels = paste(df5$Labels, "for Age Group ", df5$`Age_Group_min`), main="First Dose administered by Age Group for all DHB", col=terrain.colors(length(df5$Labels)))
-
-```
-
-```{r plot55}
-df55sum<-sum(Vaccin_DHB$`Second dose administered`)
-df55 = Vaccin_DHB%>%
-  group_by(`Age_Group_min`) %>%
-  summarise(Sum = sum(`Second dose administered`), Labels=percent(sum(`Second dose administered`)/ df55sum ) )%>%
-  mutate(New_Var = paste0(`Age_Group_min`))
-
-#remove values less than 1% as they are not significant
-df55<-df55[which(df55$Labels>1),]
-
-#plot a pie
-pie(df55$Sum, labels = paste(df55$Labels,"for Age Group",df55$`Age_Group_min`), main="Second Dose administered by Age Group for all DHB", col=terrain.colors(length(df55$Labels)))
-  
-```
-
-```{r plot9}
-
-df9sum<-sum(Vaccin_DHB$`First dose administered`)
-df9 = Vaccin_DHB%>%
-  group_by(`Gender`) %>%
-  summarise(Sum = sum(`First dose administered`), Labels=percent(sum(`First dose administered`)/ df9sum ) )%>%
-  mutate(New_Var = paste0(`Gender`))
-
-#remove values less than 1% as they are not significant
-df9<-df9[which(df9$Labels>1),]
-
-#plot a pie
-pie(df9$Sum, labels = paste(df9$Labels, df9$`Gender`), main="First Dose administered by Gender for all DHB", col=terrain.colors(length(df9$Labels)))
-
-```
-
-```{r plot99}
-df99sum<-sum(Vaccin_DHB$`Second dose administered`)
-df99 = Vaccin_DHB%>%
-  group_by(`Gender`) %>%
-  summarise(Sum = sum(`Second dose administered`), Labels=percent(sum(`Second dose administered`)/ df99sum ) )%>%
-  mutate(New_Var = paste0(`Gender`))
-
-#remove values less than 1% as they are not significant
-df99<-df99[which(df99$Labels>1),]
-
-#plot a pie
-pie(df99$Sum, labels = paste(df99$Labels,df99$`Gender`), main="Second Dose administered by Gender for all DHB", col=terrain.colors(length(df99$Labels)))
-  
-```
-```{r plot100}
-library(scales)
-df100 = Vaccin_DHB%>%
-  group_by(`DHB of residence`) %>%
-  summarise(Sum = sum(`First dose administered`), pop=sum(`Population`) )%>%
-  mutate(New_Var = paste0(`DHB of residence`))
-
-ggplot(df100, aes(x = New_Var, y =Sum/pop, fill =`DHB of residence`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  scale_y_continuous(labels=scales::percent) +
-  ggtitle("First dose dose vaccin admin in % of a total pupolation by DHB")+
-  xlab("DHB of residence") +
-  ylab("First dose administered, %")+
-  theme(legend.position="down")
-
-```
-
-```{r plot100a}
-
-library(scales)
-df100a = Vaccin_DHB%>%
-  group_by(`DHB of residence`) %>%
-  summarise(Sum = sum(`Second dose administered`), pop=sum(`Population`) )%>%
-  mutate(New_Var = paste0(`DHB of residence`))
-
-ggplot(df100a, aes(x = New_Var, y =Sum/pop, fill =`DHB of residence`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  scale_y_continuous(labels=scales::percent) +
-  ggtitle("Second dose vaccin admin in % of a total pupolation by Ethnicity for all DHB")+
-  xlab("DHB of residence") +
-  ylab("Second dose administered, %")+
-  theme(legend.position="down")
-  
-```
-
-```{r plot100b}
-
-df100$name <-"First dose administered"
-df100a$name <-"Second dose administered"
-d100<-rbind(df100, df100a)
-
-ggplot(d100, aes(x = New_Var, y =Sum/pop, fill =`name`)) +
-  geom_bar(stat = "identity", color = "black",position = position_dodge(), width = 0.7)+
-  theme(axis.text.x = element_text(face = "bold",angle = 90),
-  legend.title = element_blank()) +
-  scale_y_continuous(labels=scales::percent) +
-  ggtitle("Vaccin admin in % of a total pupolation by DHB")+
-  xlab("DHB of residence") +
-  ylab("Dose administered, %")
-  
-```
-```{r plot101}
-library(sf)
-library(raster)
-library(dplyr)
-library(spData)
-#library(spDataLarge)
-library(tmap)
-library(dplyr)
-data(nz, land)
-
-
-
-Vaccin_DHB<-Vaccin_DHB %>%
-  mutate(Name = case_when(
-    grepl("Auckland Metro", as.character(`DHB of residence`)) ~ "Auckland",
-    grepl("Bay of Plenty", as.character(`DHB of residence`)) ~ "Bay of Plenty",
-    grepl("Canterbury", as.character(`DHB of residence`)) ~ "Canterbury",
-    grepl("Capital & Coast and Hutt Valley", as.character(`DHB of residence`)) ~ "Wellington",
-    grepl("Hawkes Bay", as.character(`DHB of residence`)) ~ "Hawke's Bay",
-    grepl("Lakes", as.character(`DHB of residence`)) ~ "Bay of Plenty",
-    grepl("MidCentral", as.character(`DHB of residence`)) ~ "Manawatu-Wanganui",
-    grepl("Nelson Marlborough", as.character(`DHB of residence`)) ~ "Tasman",
-    grepl("Northland", as.character(`DHB of residence`)) ~ "Northland",
-    grepl("South Canterbury", as.character(`DHB of residence`)) ~ "Canterbury",
-    grepl("Southern", as.character(`DHB of residence`)) ~ "Southland",
-    grepl("Tairawhiti", as.character(`DHB of residence`)) ~ "Gisborne",
-    grepl("Taranaki", as.character(`DHB of residence`)) ~ "Taranaki",
-    grepl("Waikato", as.character(`DHB of residence`)) ~ "Waikato",
-    grepl("Wairarapa", as.character(`DHB of residence`)) ~ "Wellington",
-    grepl("West Coast", as.character(`DHB of residence`)) ~ "West Coast",
-    grepl("Whanganui", as.character(`DHB of residence`)) ~ "Manawatu-Wanganui"
-    ))
-
-Vaccin_DHB$Name<-factor(Vaccin_DHB$Name)
-df101sum<-sum(Vaccin_DHB$`First dose administered`)
-
-df101 = Vaccin_DHB%>%
-  group_by(`Name`) %>%
-  summarise(`First dose administered` = sum(`First dose administered`))%>%
-  mutate(New_Var = paste0(`Name`))
-
-
-nz <- left_join(nz, df101, by = "Name", all=TRUE)
-
-tmap_mode("plot")
-## tmap mode set to plotting
-tm1<-tm_shape(nz) +
-tm_fill() +
-tm_bubbles(size="First dose administered", col="red", size.lim=c(0, 2e7))+
-  tm_borders("white", lwd = .5) +
-  tm_layout(bg.color = "skyblue", inner.margins = c(0, .02, .02, .02))
-
-tm2 <-tm_shape(nz) +
-tm_polygons("First dose administered", title = "First dose administered", palette = "Blues", contrast = 0.7, border.col = "gray30", id = "Name")
-
-tmap_arrange(tm1)
-
-```
-```{r plot101a}
-library(sf)
-library(raster)
-library(dplyr)
-library(spData)
-#library(spDataLarge)
-library(tmap)
-library(dplyr)
-data(nz, land)
-
-df101asum<-sum(Vaccin_DHB$`Second dose administered`)
-
-df101a = Vaccin_DHB%>%
-  group_by(`Name`) %>%
-  summarise(`Second dose administered` = sum(`Second dose administered`))%>%
-  mutate(New_Var = paste0(`Name`))
-
-
-nz <- left_join(nz, df101a, by = "Name", all=TRUE)
-
-tmap_mode("plot")
-## tmap mode set to plotting
-tm1 <-tm_shape(nz) +
-tm_fill() +
-tm_bubbles(size="Second dose administered", col="red", size.lim=c(0, 2e7))+
-  tm_borders("white", lwd = .5) +
-  tm_layout(bg.color = "skyblue", inner.margins = c(0, .02, .02, .02))
-
-tm2 <-tm_shape(nz) +
-tm_polygons("First dose administered", title = "First dose administered", palette = "Blues", contrast = 0.7, border.col = "gray30", id = "Name")
-
-tmap_arrange(tm1)
