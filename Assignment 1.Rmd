@@ -240,7 +240,7 @@ To keep the dataset clear I will remove the rows with the various or unknown dat
 ```{r dataset_clean}
 Vaccin_DHB<-filter(Vaccin_DHB, 
                     Vaccin_DHB$`DHB of residence`!="Various",
-                   Vaccin_DHB$`DHB of residence`!="Overseas / Unknown",
+                    Vaccin_DHB$`DHB of residence`!="Overseas / Unknown",
                     Vaccin_DHB$`Ethnic group`!="Unknown",
                     Vaccin_DHB$`Ethnic group`!="Various",
                     Vaccin_DHB$`Age group`!="Various",
@@ -794,7 +794,7 @@ Observations_CPCOV10 dataframe includs 84 observations and 9 variables. After th
 
 
 
-**### Cumulative vaccination dataset analisys**
+### Cumulative vaccination dataset analisys
 
 ### Cumulative vaccination: Data overview
 
@@ -859,7 +859,7 @@ labs(title = paste("Boxplots: Cumulative vaccinations"))+
 
 To evaluate the method performance we should split the dataset by testing and training. 
 The first 80% of data is assigned to a training and the last 20% is assigned to a testing dataset.
-We will train our methods using training dataset and find the optimal hyper parameters for our model. The model with the optimal hyperparameters will be applied to the training dataset. 
+We will train our methods using training dataset and find the optimal hyper parameters for our model. The model with the optimal hyperparameters will be applied to the testing dataset. 
 
 ```{r sampling}
 #separate "Cumulative vaccinations administered" observations as we are going to do a projection just for "Cumulative vaccinations administered"
@@ -1022,9 +1022,15 @@ vaccine_prediction_svm<-vaccine_prediction_svm[order(vaccine_prediction_svm$Peri
 
 
 #creating the model using the whole dataset
-svm_model <- svm(Value ~ Period , gamma=gammaBest, epsilon=epsilonBest, cost=costBest, kernel = "polynomial", vaccin_adm)
+#svm_model <- svm(Value ~ Period , gamma=gammaBest, epsilon=epsilonBest, cost=costBest, kernel = "polynomial", vaccin_adm)
 
-#projection
+
+tuneResultsvm_ <- tune(svm, Value ~ Period,  data = vaccin_adm, kernel = "polynomial",
+              ranges = list(gamma=2^(-1:1), epsilon = seq(0,1,0.1), cost = 2^(seq(0.5,10,.5))))
+#best model selection
+svm_model <-tuneResultsvm_$best.model
+
+
 vaccine_prediction_svm$Value <- predict(svm_model, vaccine_prediction_svm)
 
 #plot the data
@@ -1053,11 +1059,12 @@ The NZ population is 5,122,600 people which means to vaccinate 100% population t
 As per our projection using SVM: 
 -70% population will be vaccinated at the end of October;
 -80% population will be vaccinated in November;
--90% population will be vaccinated in December.
+-90% population will be vaccinated at the end of November.
 
 As I predicted model created by SVM overestimate vaccination as it doesn't look plausible. I decided to try Polynomial Regression as alternative method to do a vaccination projection.
 
 ### Cumulative vaccination: Vaccination forecast using Polynomial Regression method  
+For Polynomial Regression we will find the optimal coefficient for the  training dataset and check how the model performs on  the testing dataset. Polynomial regression works on any size of the dataset and works well on non-liner problems. The main challenge is choosing the right polynomial degree for good bias-variance tradeoff. 
 
 ```{r lm}
 #train model
