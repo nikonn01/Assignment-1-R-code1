@@ -32,7 +32,7 @@ Vaccin_DHB dataframe contains 2676 observations and 9 variables. After the data 
 ```{r read_excel1}
 
 library("readxl")
-Vaccin_DHB <- read_excel("covid_vaccinations.xlsx", sheet = "DHBofResidence by ethnicity")
+Vaccin_DHB <- read_excel("covid_vaccinations_21_09_2021.xlsx", sheet = "DHBofResidence by ethnicity")
 #drop last two columns
 Vaccin_DHB<-Vaccin_DHB[-c(10,11)]
 Vaccin_DHB$`DHB of residence`<-factor(Vaccin_DHB$`DHB of residence`)
